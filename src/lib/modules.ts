@@ -319,16 +319,17 @@ export const SYSTEM_MODULES: ModuleGroup[] = [
   {
     id: "governance",
     name: "الصلاحيات والحماية",
-    summary: "من يرى ماذا، ومن عدّل ماذا، وكيف تُستعاد البيانات.",
+    summary: "من يرى ماذا ومن يعدّل ماذا، ثم أثر كل تغيير وكيف تُستعاد البيانات.",
     icon: ShieldCheck,
     modules: [
       {
         id: "roles",
         name: "الأدوار والصلاحيات",
         purpose:
-          "أدوار محددة (مدير، مشرف، مشغّل، مراجع) لكل شاشة وكل إجراء.",
+          "أدوار محددة (مالك، مدير، مراجع، مشغّل) لكل شاشة وكل إجراء، منفَّذة على مستوى النظام.",
         icon: KeyRound,
-        availability: "roadmap",
+        availability: "live",
+        route: "/team",
       },
       {
         id: "audit-trail",

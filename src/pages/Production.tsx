@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/AppShell";
 import { Panel } from "@/components/Panel";
 import { ProductionFormDialog } from "@/components/ProductionFormDialog";
+import { RoleNotice } from "@/components/RoleNotice";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +36,8 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { api } from "@/convex/_generated/api";
 import { accumulate, emptyBucket, summarize } from "@/convex/measures";
 import type { Bucket, EnrichedLog } from "@/convex/measures";
+import { canEditLog } from "@/convex/permissions";
+import { useAccess } from "@/hooks/use-access";
 import { downloadCsv } from "@/lib/csv";
 import {
   MIX_NAMES,
@@ -60,6 +63,7 @@ import { useMutation, useQuery } from "convex/react";
 import {
   Download,
   Loader2,
+  Lock,
   Pencil,
   Plus,
   Search,
@@ -67,7 +71,7 @@ import {
   Truck,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
 const RANGES = [
@@ -107,6 +111,11 @@ function StatTile({
 
 export default function Production() {
   const today = useMemo(() => todayISO(), []);
+  const access = useAccess();
+  const financialsVisible = access.can("viewFinancials");
+  const canCreate = access.can("createLog");
+  const canDelete = access.can("deleteLog");
+
   const [rangeKey, setRangeKey] = useState("30");
   const [customFrom, setCustomFrom] = useState(addDaysISO(today, -29));
   const [customTo, setCustomTo] = useState(today);
@@ -124,8 +133,12 @@ export default function Production() {
       ? { from: customFrom, to: customTo }
       : { from: windowStartISO(Number(rangeKey), today), to: today };
 
-  const rows = useQuery(api.production.list, range);
+  const ledger = useQuery(api.production.list, range);
+  const allRows = ledger?.rows;
   const removeLog = useMutation(api.production.remove);
+  // Hold the skeleton until the role is resolved so restricted roles never
+  // flash money columns they are not allowed to see.
+  const isLoading = !access.isReady || allRows === undefined;
 
   // «تسجيل قيد إنتاج» on the dashboard deep-links to /production?new=1 — the
   // dialog state is derived from the URL instead of synced with an effect.
@@ -143,13 +156,13 @@ export default function Production() {
 
   const mixOptions = useMemo(() => {
     const found = new Set(MIX_NAMES);
-    for (const row of rows ?? []) found.add(row.mixDesign);
+    for (const row of allRows ?? []) found.add(row.mixDesign);
     return [...found].sort();
-  }, [rows]);
+  }, [allRows]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return (rows ?? []).filter((row) => {
+    return (allRows ?? []).filter((row) => {
       if (mixFilter !== "all" && row.mixDesign !== mixFilter) return false;
       if (statusFilter !== "all" && row.status !== statusFilter) return false;
       if (!term) return true;
@@ -157,7 +170,7 @@ export default function Production() {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(term));
     });
-  }, [rows, mixFilter, statusFilter, search]);
+  }, [allRows, mixFilter, statusFilter, search]);
 
   const { daily, totals } = useMemo(() => {
     const map = new Map<string, Bucket>();
@@ -192,22 +205,25 @@ export default function Production() {
         التاريخ: row.date,
         الوردية: SHIFT_SHORT_LABELS[row.shift as Shift],
         الخلطة: row.mixDesign,
-        "العميل": row.customer,
-        "الموقع": row.site ?? "",
+        العميل: row.customer,
+        الموقع: row.site ?? "",
         "رقم الطلبية": row.orderRef ?? "",
         "كمية منتجة (م³)": row.quantityM3,
         "كمية مسلّمة (م³)": row.deliveredM3,
         "كمية مرتجعة (م³)": row.returnedM3,
-        "سعر المتر (ج.م)": row.pricePerM3,
-        "تكلفة المتر (ج.م)": row.costPerM3,
-        "الإيراد (ج.م)": row.revenue,
-        "التكلفة (ج.م)": row.cost,
-        "صافي الربح (ج.م)": row.profit,
-        "هامش الربح (%)": row.marginPct,
+        "عدد العربات": row.truckCount,
         "التسليم في الموعد": row.onTime ? "نعم" : "لا",
         الحالة: STATUS_LABELS[row.status as LogStatus],
-        "عدد العربات": row.truckCount,
-        "بيانات تجريبية": row.isTestData ? "نعم" : "لا",
+        ...(financialsVisible
+          ? {
+              "سعر المتر (ج.م)": row.pricePerM3,
+              "تكلفة المتر (ج.م)": row.costPerM3,
+              "الإيراد (ج.م)": row.revenue,
+              "التكلفة (ج.م)": row.cost,
+              "صافي الربح (ج.م)": row.profit,
+              "هامش الربح (%)": row.marginPct,
+            }
+          : {}),
       })),
     );
   };
@@ -222,25 +238,44 @@ export default function Production() {
         <Download className="size-4" />
         تصدير CSV
       </Button>
-      <Button
-        onClick={() => {
-          setEditing(null);
-          setDialogOpen(true);
-        }}
-      >
-        <Plus className="size-4" />
-        قيد إنتاج جديد
-      </Button>
+      {canCreate && (
+        <Button
+          onClick={() => {
+            setEditing(null);
+            setDialogOpen(true);
+          }}
+        >
+          <Plus className="size-4" />
+          قيد إنتاج جديد
+        </Button>
+      )}
     </>
   );
 
   return (
     <AppShell
-      eyebrow="إدخال ومراجعة بيانات اليوم"
+      eyebrow={
+        financialsVisible ? "إدخال ومراجعة بيانات اليوم" : "إدخال بيانات اليوم"
+      }
       title="الإنتاج والكميات اليومية"
       description="سجّل كميات الخرسانة لكل وردية وعميل، وراجع الإيراد والتكلفة وصافي الربح قبل إغلاق الوردية."
       actions={actions}
     >
+      {!financialsVisible && (
+        <RoleNotice
+          className="mb-4 p-4"
+          icon={Lock}
+          title={`دورك الحالي: ${access.label}`}
+          message="تُسجَّل الكميات والخلطات والمواعيد كما هي، ويُسعّر القيد تلقائيًا من قائمة الأسعار المعتمدة للمحطة."
+          hint="الأرقام المالية (سعر المتر، التكلفة، الربح، الهامش) متاحة للمالك والمدير والمراجع. يمكن لمالك النظام ترقية دورك من شاشة الفريق والصلاحيات."
+          action={
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/team">الفريق والصلاحيات</Link>
+            </Button>
+          }
+        />
+      )}
+
       {/* Filters */}
       <div className="soft-card mb-4 flex flex-wrap items-end gap-3 rounded-2xl border border-border/70 bg-card p-4">
         <div className="space-y-1.5">
@@ -355,22 +390,6 @@ export default function Production() {
           )}`}
         />
         <StatTile
-          label="الإيراد"
-          value={formatEGP(totals.revenue)}
-          hint={`متوسط السعر ${formatNumber(totals.pricePerM3, 1)} ج.م/م³`}
-        />
-        <StatTile
-          label="التكلفة"
-          value={formatEGP(totals.cost)}
-          hint={`تكلفة المتر ${formatNumber(totals.costPerM3, 1)} ج.م`}
-        />
-        <StatTile
-          label="صافي الربح"
-          value={formatSignedEGP(totals.profit)}
-          hint={`هامش ${formatPercent(totals.marginPct)}`}
-          tone={totals.profit >= 0 ? "success" : "danger"}
-        />
-        <StatTile
           label="التسليم في الموعد"
           value={formatPercent(totals.onTimePct)}
           hint={`${formatNumber(totals.trucks)} عربة · ${formatNumber(
@@ -378,16 +397,58 @@ export default function Production() {
             1,
           )} م³/عربة`}
         />
+        {financialsVisible ? (
+          <>
+            <StatTile
+              label="الإيراد"
+              value={formatEGP(totals.revenue)}
+              hint={`متوسط السعر ${formatNumber(totals.pricePerM3, 1)} ج.م/م³`}
+            />
+            <StatTile
+              label="التكلفة"
+              value={formatEGP(totals.cost)}
+              hint={`تكلفة المتر ${formatNumber(totals.costPerM3, 1)} ج.م`}
+            />
+            <StatTile
+              label="صافي الربح"
+              value={formatSignedEGP(totals.profit)}
+              hint={`هامش ${formatPercent(totals.marginPct)}`}
+              tone={totals.profit >= 0 ? "success" : "danger"}
+            />
+          </>
+        ) : (
+          <>
+            <StatTile
+              label="الكمية المرتجعة"
+              value={formatM3(totals.returnedM3)}
+              hint={`نسبة المرتجع ${formatPercent(totals.returnRatePct)}`}
+            />
+            <StatTile
+              label="كفاءة الإنتاج"
+              value={formatPercent(totals.efficiencyPct)}
+              hint="الكمية المسلّمة من الكمية المنتجة"
+            />
+            <StatTile
+              label="قيود الفترة"
+              value={formatNumber(totals.logs)}
+              hint={`${formatNumber(allRows?.length ?? 0)} قيد في النطاق الزمني`}
+            />
+          </>
+        )}
       </div>
 
       {/* Daily summary */}
       <Panel
         className="mt-4 overflow-hidden"
         title="الملخص اليومي"
-        description="مجموع الكميات والأرباح لكل يوم في الفترة المحددة."
+        description={
+          financialsVisible
+            ? "مجموع الكميات والأرباح لكل يوم في الفترة المحددة."
+            : "مجموع الكميات لكل يوم في الفترة المحددة."
+        }
         bodyClassName="px-0 pb-0 pt-2"
       >
-        {rows === undefined ? (
+        {isLoading ? (
           <div className="px-5 pb-5">
             <Skeleton className="h-40 rounded-xl" />
           </div>
@@ -404,10 +465,14 @@ export default function Production() {
                 <TableHead className="text-end">منتج (م³)</TableHead>
                 <TableHead className="text-end">مسلّم (م³)</TableHead>
                 <TableHead className="text-end">مرتجع (م³)</TableHead>
-                <TableHead className="text-end">الإيراد</TableHead>
-                <TableHead className="text-end">التكلفة</TableHead>
-                <TableHead className="text-end">صافي الربح</TableHead>
-                <TableHead className="pe-5 text-end">الهامش</TableHead>
+                {financialsVisible && (
+                  <>
+                    <TableHead className="text-end">الإيراد</TableHead>
+                    <TableHead className="text-end">التكلفة</TableHead>
+                    <TableHead className="text-end">صافي الربح</TableHead>
+                    <TableHead className="pe-5 text-end">الهامش</TableHead>
+                  </>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -431,23 +496,27 @@ export default function Production() {
                     <TableCell className="text-end tabular-nums text-muted-foreground">
                       {formatNumber(day.returnedM3, 1)}
                     </TableCell>
-                    <TableCell className="text-end tabular-nums">
-                      {formatEGP(day.revenue)}
-                    </TableCell>
-                    <TableCell className="text-end tabular-nums">
-                      {formatEGP(day.cost)}
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        "text-end font-medium tabular-nums",
-                        profit >= 0 ? "text-success" : "text-destructive",
-                      )}
-                    >
-                      {formatSignedEGP(profit)}
-                    </TableCell>
-                    <TableCell className="pe-5 text-end tabular-nums">
-                      {formatPercent(margin)}
-                    </TableCell>
+                    {financialsVisible && (
+                      <>
+                        <TableCell className="text-end tabular-nums">
+                          {formatEGP(day.revenue)}
+                        </TableCell>
+                        <TableCell className="text-end tabular-nums">
+                          {formatEGP(day.cost)}
+                        </TableCell>
+                        <TableCell
+                          className={cn(
+                            "text-end font-medium tabular-nums",
+                            profit >= 0 ? "text-success" : "text-destructive",
+                          )}
+                        >
+                          {formatSignedEGP(profit)}
+                        </TableCell>
+                        <TableCell className="pe-5 text-end tabular-nums">
+                          {formatPercent(margin)}
+                        </TableCell>
+                      </>
+                    )}
                   </TableRow>
                 );
               })}
@@ -463,7 +532,7 @@ export default function Production() {
         description={`${formatNumber(filtered.length)} قيدًا مطابقًا للفلاتر الحالية.`}
         bodyClassName="px-0 pb-0 pt-2"
       >
-        {rows === undefined ? (
+        {isLoading ? (
           <div className="space-y-2 px-5 pb-5">
             {Array.from({ length: 6 }).map((_, index) => (
               <Skeleton key={index} className="h-10 rounded-lg" />
@@ -478,16 +547,18 @@ export default function Production() {
             <p className="mt-1 text-xs text-muted-foreground">
               عدّل الفلاتر أو سجّل قيد إنتاج جديدًا لهذا اليوم.
             </p>
-            <Button
-              className="mt-4"
-              onClick={() => {
-                setEditing(null);
-                setDialogOpen(true);
-              }}
-            >
-              <Plus className="size-4" />
-              تسجيل قيد إنتاج
-            </Button>
+            {canCreate && (
+              <Button
+                className="mt-4"
+                onClick={() => {
+                  setEditing(null);
+                  setDialogOpen(true);
+                }}
+              >
+                <Plus className="size-4" />
+                تسجيل قيد إنتاج
+              </Button>
+            )}
           </div>
         ) : (
           <Table>
@@ -502,114 +573,138 @@ export default function Production() {
                 <TableHead className="text-end">منتج</TableHead>
                 <TableHead className="text-end">مسلّم</TableHead>
                 <TableHead className="hidden text-end lg:table-cell">مرتجع</TableHead>
-                <TableHead className="text-end">سعر/م³</TableHead>
-                <TableHead className="hidden text-end lg:table-cell">تكلفة/م³</TableHead>
-                <TableHead className="text-end">الربح</TableHead>
+                {financialsVisible && (
+                  <>
+                    <TableHead className="text-end">سعر/م³</TableHead>
+                    <TableHead className="hidden text-end lg:table-cell">
+                      تكلفة/م³
+                    </TableHead>
+                    <TableHead className="text-end">الربح</TableHead>
+                  </>
+                )}
                 <TableHead className="text-end">التوقيت</TableHead>
                 <TableHead>الحالة</TableHead>
                 <TableHead className="pe-5 text-end">إجراءات</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((row) => (
-                <TableRow key={row._id}>
-                  <TableCell className="ps-5 tabular-nums">
-                    {formatDayWithWeekday(row.date)}
-                  </TableCell>
-                  <TableCell>{SHIFT_SHORT_LABELS[row.shift as Shift]}</TableCell>
-                  <TableCell className="font-medium">{row.mixDesign}</TableCell>
-                  <TableCell className="max-w-[14rem] truncate">
-                    {row.customer}
-                    {row.isTestData && (
+              {filtered.map((row) => {
+                const canEditRow = canEditLog(access.viewer, row, today);
+                return (
+                  <TableRow key={row._id}>
+                    <TableCell className="ps-5 tabular-nums">
+                      {formatDayWithWeekday(row.date)}
+                    </TableCell>
+                    <TableCell>{SHIFT_SHORT_LABELS[row.shift as Shift]}</TableCell>
+                    <TableCell className="font-medium">{row.mixDesign}</TableCell>
+                    <TableCell className="max-w-[14rem] truncate">
+                      {row.customer}
+                      {row.isTestData && (
+                        <Badge
+                          variant="outline"
+                          className="ms-2 border-warning/40 bg-warning/10 text-[10px] text-warning-foreground"
+                        >
+                          تجريبي
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="hidden max-w-[14rem] truncate text-muted-foreground lg:table-cell">
+                      {row.site ?? "—"}
+                    </TableCell>
+                    <TableCell className="hidden tabular-nums text-muted-foreground xl:table-cell">
+                      {row.orderRef ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-end tabular-nums">
+                      {formatNumber(row.quantityM3, 1)}
+                    </TableCell>
+                    <TableCell className="text-end tabular-nums">
+                      {formatNumber(row.deliveredM3, 1)}
+                    </TableCell>
+                    <TableCell className="hidden text-end tabular-nums text-muted-foreground lg:table-cell">
+                      {formatNumber(row.returnedM3, 1)}
+                    </TableCell>
+                    {financialsVisible && (
+                      <>
+                        <TableCell className="text-end tabular-nums">
+                          {formatNumber(row.pricePerM3)}
+                        </TableCell>
+                        <TableCell className="hidden text-end tabular-nums lg:table-cell">
+                          {formatNumber(row.costPerM3)}
+                        </TableCell>
+                        <TableCell
+                          className={cn(
+                            "text-end font-medium tabular-nums",
+                            row.profit >= 0 ? "text-success" : "text-destructive",
+                          )}
+                        >
+                          {formatSignedEGP(row.profit)}
+                        </TableCell>
+                      </>
+                    )}
+                    <TableCell className="text-end">
                       <Badge
                         variant="outline"
-                        className="ms-2 border-warning/40 bg-warning/10 text-[10px] text-warning-foreground"
+                        className={cn(
+                          row.onTime
+                            ? "border-success/40 bg-success/10 text-success"
+                            : "border-destructive/40 bg-destructive/10 text-destructive",
+                        )}
                       >
-                        تجريبي
+                        {row.onTime ? "في الموعد" : "متأخر"}
                       </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="hidden max-w-[14rem] truncate text-muted-foreground lg:table-cell">
-                    {row.site ?? "—"}
-                  </TableCell>
-                  <TableCell className="hidden tabular-nums text-muted-foreground xl:table-cell">
-                    {row.orderRef ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-end tabular-nums">
-                    {formatNumber(row.quantityM3, 1)}
-                  </TableCell>
-                  <TableCell className="text-end tabular-nums">
-                    {formatNumber(row.deliveredM3, 1)}
-                  </TableCell>
-                  <TableCell className="hidden text-end tabular-nums text-muted-foreground lg:table-cell">
-                    {formatNumber(row.returnedM3, 1)}
-                  </TableCell>
-                  <TableCell className="text-end tabular-nums">
-                    {formatNumber(row.pricePerM3)}
-                  </TableCell>
-                  <TableCell className="hidden text-end tabular-nums lg:table-cell">
-                    {formatNumber(row.costPerM3)}
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      "text-end font-medium tabular-nums",
-                      row.profit >= 0 ? "text-success" : "text-destructive",
-                    )}
-                  >
-                    {formatSignedEGP(row.profit)}
-                  </TableCell>
-                  <TableCell className="text-end">
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        row.onTime
-                          ? "border-success/40 bg-success/10 text-success"
-                          : "border-destructive/40 bg-destructive/10 text-destructive",
-                      )}
-                    >
-                      {row.onTime ? "في الموعد" : "متأخر"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        row.status === "cancelled" &&
-                          "border-destructive/40 bg-destructive/10 text-destructive",
-                        row.status === "in_progress" &&
-                          "border-warning/40 bg-warning/10 text-warning-foreground",
-                        row.status === "delivered" && "text-muted-foreground",
-                      )}
-                    >
-                      {STATUS_LABELS[row.status as LogStatus]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="pe-5">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="تعديل القيد"
-                        onClick={() => {
-                          setEditing(row);
-                          setDialogOpen(true);
-                        }}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          row.status === "cancelled" &&
+                            "border-destructive/40 bg-destructive/10 text-destructive",
+                          row.status === "in_progress" &&
+                            "border-warning/40 bg-warning/10 text-warning-foreground",
+                          row.status === "delivered" && "text-muted-foreground",
+                        )}
                       >
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="حذف القيد"
-                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => setPendingDelete(row)}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                        {STATUS_LABELS[row.status as LogStatus]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="pe-5">
+                      <div className="flex items-center justify-end gap-1">
+                        {canEditRow ? (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label="تعديل القيد"
+                            onClick={() => {
+                              setEditing(row);
+                              setDialogOpen(true);
+                            }}
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                        ) : (
+                          <span
+                            className="grid size-8 place-items-center text-muted-foreground/50"
+                            title="تعديل هذا القيد خارج نطاق دورك"
+                          >
+                            <Lock className="size-3.5" />
+                          </span>
+                        )}
+                        {canDelete && (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label="حذف القيد"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => setPendingDelete(row)}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
             <TableFooter>
               <TableRow className="hover:bg-transparent">
@@ -625,22 +720,31 @@ export default function Production() {
                 <TableCell className="hidden text-end font-semibold tabular-nums lg:table-cell">
                   {formatNumber(totals.returnedM3, 1)}
                 </TableCell>
-                <TableCell className="text-end font-semibold tabular-nums">
-                  {formatNumber(totals.pricePerM3, 1)}
-                </TableCell>
-                <TableCell className="hidden text-end font-semibold tabular-nums lg:table-cell">
-                  {formatNumber(totals.costPerM3, 1)}
-                </TableCell>
+                {financialsVisible ? (
+                  <>
+                    <TableCell className="text-end font-semibold tabular-nums">
+                      {formatNumber(totals.pricePerM3, 1)}
+                    </TableCell>
+                    <TableCell className="hidden text-end font-semibold tabular-nums lg:table-cell">
+                      {formatNumber(totals.costPerM3, 1)}
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        "text-end font-semibold tabular-nums",
+                        totals.profit >= 0 ? "text-success" : "text-destructive",
+                      )}
+                    >
+                      {formatSignedEGP(totals.profit)}
+                    </TableCell>
+                  </>
+                ) : null}
                 <TableCell
-                  className={cn(
-                    "text-end font-semibold tabular-nums",
-                    totals.profit >= 0 ? "text-success" : "text-destructive",
-                  )}
+                  colSpan={3}
+                  className="pe-5 text-end text-muted-foreground"
                 >
-                  {formatSignedEGP(totals.profit)}
-                </TableCell>
-                <TableCell colSpan={3} className="pe-5 text-end text-muted-foreground">
-                  إيراد {formatEGP(totals.revenue)}
+                  {financialsVisible
+                    ? `إيراد ${formatEGP(totals.revenue)}`
+                    : `إجمالي مسلّم ${formatM3(totals.deliveredM3)}`}
                 </TableCell>
               </TableRow>
             </TableFooter>

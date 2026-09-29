@@ -1,3 +1,5 @@
+import { STANDARD_MIX_PRICES } from "@/convex/pricing";
+
 /** Shared vocabulary of the ready-mix plant used by the v1 screens. */
 
 export type Shift = "morning" | "evening" | "night";
@@ -26,18 +28,13 @@ export const STATUS_LABELS: Record<LogStatus, string> = {
 };
 
 /**
- * Standard grades with a reference selling price and cost per m³ (EGP).
- * Used to prefill the daily entry form — the operator can always override.
+ * Standard grades with the plant's approved selling price and cost per m³
+ * (EGP). The same table prices operator entries on the server, so the form and
+ * the backend can never disagree about a grade's price.
  */
-export const MIX_PRESETS = [
-  { name: "C20/25", price: 1290, cost: 1045 },
-  { name: "C25/30", price: 1405, cost: 1118 },
-  { name: "C30/37", price: 1530, cost: 1205 },
-  { name: "C35/45", price: 1665, cost: 1312 },
-  { name: "C40/50", price: 1820, cost: 1438 },
-];
+export { STANDARD_MIX_PRICES as MIX_PRESETS } from "@/convex/pricing";
 
-export const MIX_NAMES = MIX_PRESETS.map((mix) => mix.name);
+export const MIX_NAMES = STANDARD_MIX_PRICES.map((mix) => mix.name);
 
 /** Truck mixer drum capacity used to estimate the number of trips. */
 export const TRUCK_CAPACITY_M3 = 9;

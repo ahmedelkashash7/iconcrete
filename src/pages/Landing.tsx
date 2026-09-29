@@ -1,7 +1,13 @@
 import { BrandLockup, BrandMark } from "@/components/BrandMark";
+import { RoleMatrix } from "@/components/RoleMatrix";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  ROLE_DESCRIPTIONS,
+  ROLE_LABELS,
+  ROLE_ORDER,
+} from "@/convex/permissions";
 import {
   ALL_MODULES,
   DEPARTMENT_LINE,
@@ -254,6 +260,9 @@ export default function Landing() {
             </a>
             <a className="transition-colors hover:text-foreground" href="#system">
               منظومة الوحدات
+            </a>
+            <a className="transition-colors hover:text-foreground" href="#roles">
+              الأدوار والصلاحيات
             </a>
             <a className="transition-colors hover:text-foreground" href="#principles">
               مبادئ النظام
@@ -566,10 +575,47 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Principles */}
-      <section id="principles" className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
+      {/* Roles & permissions */}
+      <section
+        id="roles"
+        className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 lg:py-20"
+      >
         <SectionTitle
           index="05"
+          eyebrow="الأدوار والصلاحيات"
+          title="من يرى ماذا، ومن يعدّل ماذا"
+          description="أربعة أدوار تغطي فريق المحطة: المالك يوزّع الصلاحيات، والمدير يدير التشغيل والأرقام، والمراجع يطالع ويصحّح، والمشغّل يُدخل بيانات ورديته."
+        />
+
+        <div className="soft-card mt-12 overflow-hidden rounded-3xl border border-border/70 bg-card p-5 sm:p-7">
+          <RoleMatrix />
+          <p className="mt-5 text-[11px] leading-5 text-muted-foreground">
+            الصلاحيات مفروضة من قاعدة البيانات نفسها، وليست إخفاءً لأزرار: كل طلب
+            لا يملك صاحبه صلاحيته يُرفض حتى لو أُرسل خارج الواجهة. والمشغّل لا
+            يُدخل أسعارًا — يُسعِّر النظام قيوده من قائمة الأسعار المعتمدة للمحطة.
+          </p>
+        </div>
+
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {ROLE_ORDER.map((role) => (
+            <div
+              key={role}
+              className="rounded-2xl border border-border/70 bg-card p-5"
+            >
+              <p className="text-sm font-semibold">{ROLE_LABELS[role]}</p>
+              <p className="mt-1.5 text-[11px] leading-5 text-muted-foreground">
+                {ROLE_DESCRIPTIONS[role]}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Principles */}
+      <section id="principles" className="border-y border-border/60 bg-card/60">
+        <div className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
+        <SectionTitle
+          index="06"
           eyebrow="مبادئ النظام"
           title="قواعد ثابتة في كل وحدة"
           description="تُطبَّق على ما يعمل الآن، وتُلزم كل وحدة قادمة بالبناء عليها."
@@ -578,7 +624,7 @@ export default function Landing() {
           {SYSTEM_PRINCIPLES.map((item) => (
             <div
               key={item.title}
-              className="rounded-2xl border border-border/70 bg-card p-5"
+              className="rounded-2xl border border-border/70 bg-background p-5"
             >
               <span className="grid size-10 place-items-center rounded-xl bg-brand/15 text-brand">
                 <item.icon className="size-5" />
@@ -589,6 +635,7 @@ export default function Landing() {
               </p>
             </div>
           ))}
+        </div>
         </div>
       </section>
 

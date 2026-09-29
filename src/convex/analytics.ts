@@ -1,5 +1,7 @@
 import { v } from "convex/values";
+import { requireViewer } from "./access";
 import { query } from "./_generated/server";
+import { can } from "./permissions";
 import {
   DATE_RE,
   MAX_ROWS,
@@ -65,6 +67,36 @@ function finalizeGroups(groups: Map<string, GroupMeasures>) {
   return [...groups.values()].map(finalizeGroup);
 }
 
+/* Roles without financial visibility receive the operational picture only. */
+
+function redactMeasures(measures: Measures): Measures {
+  return {
+    ...measures,
+    revenue: 0,
+    cost: 0,
+    profit: 0,
+    marginPct: 0,
+    costPerM3: 0,
+    pricePerM3: 0,
+  };
+}
+
+function redactGroup(group: GroupMeasures): GroupMeasures {
+  return { ...group, revenue: 0, cost: 0, profit: 0, marginPct: 0 };
+}
+
+function redactLog(log: EnrichedLog): EnrichedLog {
+  return {
+    ...log,
+    pricePerM3: 0,
+    costPerM3: 0,
+    revenue: 0,
+    cost: 0,
+    profit: 0,
+    marginPct: 0,
+  };
+}
+
 /**
  * Dashboard feed: every KPI the executive summary shows, computed from the raw
  * ledger over `days`, plus the equivalent previous window for trend deltas.
@@ -75,6 +107,8 @@ export const overview = query({
     today: v.optional(v.string()),
   },
   handler: async (ctx, { days: requestedDays, today: requestedToday }) => {
+    const viewer = await requireViewer(ctx);
+    const financialsVisible = can(viewer, "viewFinancials");
     const days = Math.min(Math.max(Math.round(requestedDays || 30), 1), 180);
     const today =
       requestedToday && DATE_RE.test(requestedToday)
@@ -161,21 +195,43 @@ export const overview = query({
       (a, b) => SHIFT_ORDER.indexOf(a.key as Shift) - SHIFT_ORDER.indexOf(b.key as Shift),
     );
 
-    return {
+    const response = {
       range: { days, start, end: today, prevStart, prevEnd },
+      financialsVisible,
       totals,
       previous: previousTotals,
       deltas,
       trend: trend as Array<Measures & { date: string }>,
       byMix: finalizeGroups(byMix).sort((a, b) => b.m3 - a.m3),
       byCustomer: finalizeGroups(byCustomer)
-        .sort((a, b) => b.revenue - a.revenue)
+        .sort((a, b) => (financialsVisible ? b.revenue - a.revenue : b.m3 - a.m3))
         .slice(0, 6),
       byShift: shifts,
       today: { date: today, ...summarize([todayBucket]) },
       recent,
       testDataCount,
       hasData: totals.logs > 0 || totals.cancelled > 0,
+    };
+
+    if (financialsVisible) return response;
+
+    return {
+      ...response,
+      totals: redactMeasures(response.totals),
+      previous: redactMeasures(response.previous),
+      deltas: {
+        ...response.deltas,
+        revenue: null,
+        cost: null,
+        profit: null,
+        costPerM3: null,
+      },
+      trend: response.trend.map((day) => ({ ...day, ...redactMeasures(day) })),
+      byMix: response.byMix.map(redactGroup),
+      byCustomer: response.byCustomer.map(redactGroup),
+      byShift: response.byShift.map(redactGroup),
+      today: { ...response.today, ...redactMeasures(response.today) },
+      recent: response.recent.map(redactLog),
     };
   },
 });

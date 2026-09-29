@@ -9,10 +9,21 @@ export const ROLES = {
   MEMBER: "member",
 } as const;
 
+/** IConcrete plant roles (see ./permissions for the capability matrix). */
+export const plantRoleValidator = v.union(
+  v.literal("owner"),
+  v.literal("manager"),
+  v.literal("reviewer"),
+  v.literal("operator"),
+);
+export type PlantRoleValue = Infer<typeof plantRoleValidator>;
+
+// Legacy template roles are kept valid so existing rows stay readable.
 export const roleValidator = v.union(
   v.literal(ROLES.ADMIN),
   v.literal(ROLES.USER),
   v.literal(ROLES.MEMBER),
+  plantRoleValidator,
 );
 export type Role = Infer<typeof roleValidator>;
 

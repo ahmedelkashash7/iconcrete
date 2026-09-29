@@ -1,7 +1,10 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
+import { requireCapability, requireViewer } from "./access";
 import { mutation, query } from "./_generated/server";
 import { DATE_RE, MAX_ROWS, addDays, enrichLog, r2, utcToday } from "./measures";
+import { can, canEditLog } from "./permissions";
+import type { Viewer } from "./permissions";
+import { standardPricing } from "./pricing";
 import { logStatusValidator, shiftValidator } from "./schema";
 import type { LogStatus, Shift } from "./schema";
 
@@ -87,27 +90,67 @@ function assertValid(input: LogInput) {
 }
 
 /** Rows for the daily ledger table, enriched with the per-row measures. */
+/**
+ * Prices are never typed by roles that cannot see money: the plant's approved
+ * price list is applied on the server before the entry is validated.
+ */
+function applyStandardPricing(viewer: Viewer, input: LogInput): LogInput {
+  if (can(viewer, "viewFinancials")) return input;
+  const preset = standardPricing(input.mixDesign);
+  return { ...input, pricePerM3: preset.price, costPerM3: preset.cost };
+}
+
+/** Strips every money field from a row before it reaches a restricted role. */
+function redactFinancials<
+  T extends {
+    pricePerM3: number;
+    costPerM3: number;
+    revenue: number;
+    cost: number;
+    profit: number;
+    marginPct: number;
+  },
+>(row: T): T {
+  return {
+    ...row,
+    pricePerM3: 0,
+    costPerM3: 0,
+    revenue: 0,
+    cost: 0,
+    profit: 0,
+    marginPct: 0,
+  };
+}
+
 export const list = query({
   args: {
     from: v.string(),
     to: v.string(),
   },
   handler: async (ctx, { from, to }) => {
+    const viewer = await requireViewer(ctx);
     const logs = await ctx.db
       .query("productionLogs")
       .withIndex("by_date", (q) => q.gte("date", from).lte("date", to))
       .order("desc")
       .take(MAX_ROWS);
 
-    return logs.map(enrichLog);
+    const rows = logs.map(enrichLog);
+    const financialsVisible = can(viewer, "viewFinancials");
+
+    return {
+      financialsVisible,
+      rows: financialsVisible ? rows : rows.map(redactFinancials),
+    };
   },
 });
 
 export const create = mutation({
   args: logFields,
-  handler: async (ctx, args) => {
+  handler: async (ctx, fields) => {
+    const viewer = await requireCapability(ctx, "createLog");
+    const args = applyStandardPricing(viewer, fields);
     assertValid(args);
-    const userId = await getAuthUserId(ctx);
     return await ctx.db.insert("productionLogs", {
       ...args,
       customer: args.customer.trim(),
@@ -121,20 +164,27 @@ export const create = mutation({
       pricePerM3: r2(args.pricePerM3),
       costPerM3: r2(args.costPerM3),
       isTestData: false,
-      createdBy: userId ?? undefined,
+      createdBy: viewer.userId,
     });
   },
 });
 
 export const update = mutation({
   args: { id: v.id("productionLogs"), ...logFields },
-  handler: async (ctx, { id, ...args }) => {
-    assertValid(args);
+  handler: async (ctx, { id, ...fields }) => {
+    const viewer = await requireViewer(ctx);
     const existing = await ctx.db.get(id);
     if (!existing) {
       throw new ConvexError("القيد لم يعد موجودًا");
     }
-    // Editing a demo row marks it as real data again.
+    if (!canEditLog(viewer, existing, utcToday())) {
+      throw new ConvexError(
+        "لا يمكنك تعديل هذا القيد بدورك الحالي — المشغّل يعدّل قيود يومه فقط",
+      );
+    }
+
+    const args = applyStandardPricing(viewer, fields);
+    assertValid(args);
     await ctx.db.patch(id, {
       ...args,
       customer: args.customer.trim(),
@@ -147,7 +197,6 @@ export const update = mutation({
       returnedM3: r2(args.returnedM3),
       pricePerM3: r2(args.pricePerM3),
       costPerM3: r2(args.costPerM3),
-      isTestData: false,
     });
     return id;
   },
@@ -156,6 +205,7 @@ export const update = mutation({
 export const remove = mutation({
   args: { id: v.id("productionLogs") },
   handler: async (ctx, { id }) => {
+    await requireCapability(ctx, "deleteLog");
     const existing = await ctx.db.get(id);
     if (!existing) return null;
     await ctx.db.delete(id);
@@ -167,6 +217,7 @@ export const remove = mutation({
 export const clearTestData = mutation({
   args: {},
   handler: async (ctx) => {
+    await requireCapability(ctx, "manageTestData");
     const rows = await ctx.db
       .query("productionLogs")
       .withIndex("by_date")
@@ -227,6 +278,7 @@ function mulberry32(seed: number) {
 export const seedDemoData = mutation({
   args: { today: v.optional(v.string()) },
   handler: async (ctx, { today }) => {
+    await requireCapability(ctx, "manageTestData");
     const existing = await ctx.db.query("productionLogs").take(1);
     if (existing.length > 0) {
       return { inserted: 0, skipped: true };

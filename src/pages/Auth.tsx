@@ -194,6 +194,12 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       <UserX className="size-4" />
                       الدخول كزائر (استعراض سريع للمنظومة)
                     </Button>
+
+                    <p className="mt-3 text-center text-[11px] leading-5 text-muted-foreground">
+                      الزائر يستعرض المؤشرات ويجرّب الإدخال، دون حذف بيانات أو
+                      إدارة أدوار. وأول حساب يُسجَّل بالبريد يصبح «مالك» النظام
+                      ويوزّع الصلاحيات على الفريق من شاشة الفريق والصلاحيات.
+                    </p>
                   </div>
                 </CardContent>
               </form>

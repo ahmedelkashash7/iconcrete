@@ -30,11 +30,19 @@ import {
   TRUCK_CAPACITY_M3,
 } from "@/lib/concrete";
 import type { LogStatus, Shift } from "@/lib/concrete";
+import { useAccess } from "@/hooks/use-access";
 import { errorMessage as readError } from "@/lib/errors";
-import { formatEGP, formatM3, formatSignedEGP, todayISO } from "@/lib/format";
+import {
+  formatEGP,
+  formatM3,
+  formatNumber,
+  formatPercent,
+  formatSignedEGP,
+  todayISO,
+} from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useMutation } from "convex/react";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Lock, Save } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { toast } from "sonner";
@@ -135,6 +143,8 @@ function ProductionForm({
   defaultDate: string;
   onDone: () => void;
 }) {
+  const access = useAccess();
+  const financialsVisible = access.can("viewFinancials");
   const createLog = useMutation(api.production.create);
   const updateLog = useMutation(api.production.update);
   const [form, setForm] = useState<FormState>(() =>
@@ -375,29 +385,43 @@ function ProductionForm({
           />
         </FormRow>
 
-        <FormRow label="سعر البيع للمتر (ج.م)">
-          <Input
-            type="number"
-            min="0"
-            step="any"
-            inputMode="decimal"
-            value={form.pricePerM3}
-            onChange={(event) => set("pricePerM3", event.target.value)}
-            required
-          />
-        </FormRow>
+        {financialsVisible ? (
+          <>
+            <FormRow label="سعر البيع للمتر (ج.م)">
+              <Input
+                type="number"
+                min="0"
+                step="any"
+                inputMode="decimal"
+                value={form.pricePerM3}
+                onChange={(event) => set("pricePerM3", event.target.value)}
+                required
+              />
+            </FormRow>
 
-        <FormRow label="تكلفة المتر (ج.م)">
-          <Input
-            type="number"
-            min="0"
-            step="any"
-            inputMode="decimal"
-            value={form.costPerM3}
-            onChange={(event) => set("costPerM3", event.target.value)}
-            required
-          />
-        </FormRow>
+            <FormRow label="تكلفة المتر (ج.م)">
+              <Input
+                type="number"
+                min="0"
+                step="any"
+                inputMode="decimal"
+                value={form.costPerM3}
+                onChange={(event) => set("costPerM3", event.target.value)}
+                required
+              />
+            </FormRow>
+          </>
+        ) : (
+          <div className="flex items-start gap-3 rounded-xl border border-dashed border-border bg-muted/40 p-3 sm:col-span-2">
+            <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl bg-background text-muted-foreground">
+              <Lock className="size-4" />
+            </span>
+            <p className="text-[11px] leading-5 text-muted-foreground">
+              دورك الحالي لا يشمل إدخال الأسعار: يُسعّر القيد تلقائيًا من قائمة
+              الأسعار والتكاليف المعتمدة للخلطة المختارة عند الحفظ.
+            </p>
+          </div>
+        )}
 
         <FormRow label="حالة القيد">
           <Select
@@ -444,28 +468,47 @@ function ProductionForm({
           </p>
         </div>
         <div>
-          <p className="text-[11px] text-muted-foreground">الإيراد المتوقع</p>
+          <p className="text-[11px] text-muted-foreground">الكمية المرتجعة</p>
           <p className="mt-1 text-sm font-semibold tabular-nums">
-            {formatEGP(projectedRevenue)}
+            {formatM3(returnQty, 1)}
           </p>
         </div>
-        <div>
-          <p className="text-[11px] text-muted-foreground">التكلفة المتوقعة</p>
-          <p className="mt-1 text-sm font-semibold tabular-nums">
-            {formatEGP(projectedCost)}
-          </p>
-        </div>
-        <div>
-          <p className="text-[11px] text-muted-foreground">الربح المتوقع</p>
-          <p
-            className={cn(
-              "mt-1 text-sm font-semibold tabular-nums",
-              projectedProfit >= 0 ? "text-success" : "text-destructive",
-            )}
-          >
-            {formatSignedEGP(projectedProfit)}
-          </p>
-        </div>
+        {financialsVisible ? (
+          <>
+            <div>
+              <p className="text-[11px] text-muted-foreground">الإيراد المتوقع</p>
+              <p className="mt-1 text-sm font-semibold tabular-nums">
+                {formatEGP(projectedRevenue)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] text-muted-foreground">الربح المتوقع</p>
+              <p
+                className={cn(
+                  "mt-1 text-sm font-semibold tabular-nums",
+                  projectedProfit >= 0 ? "text-success" : "text-destructive",
+                )}
+              >
+                {formatSignedEGP(projectedProfit)}
+              </p>
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <p className="text-[11px] text-muted-foreground">عدد العربات</p>
+              <p className="mt-1 text-sm font-semibold tabular-nums">
+                {formatNumber(toNumber(form.truckCount))}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] text-muted-foreground">كفاءة الكميات</p>
+              <p className="mt-1 text-sm font-semibold tabular-nums">
+                {formatPercent(quantity > 0 ? (delivered / quantity) * 100 : 0)}
+              </p>
+            </div>
+          </>
+        )}
       </div>
 
       {error && (

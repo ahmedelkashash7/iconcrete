@@ -16,6 +16,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { useAccess } from "@/hooks/use-access";
 import { useAuth } from "@/hooks/use-auth";
 import { formatFullDate, todayISO } from "@/lib/format";
 import { SYSTEM_MODULES } from "@/lib/modules";
@@ -28,6 +29,7 @@ import {
   LogOut,
   Menu,
   ShieldCheck,
+  Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
@@ -57,6 +59,13 @@ const APP_NAV: NavItem[] = [
     icon: Factory,
     audience: "فريق التشغيل",
   },
+  {
+    to: "/team",
+    label: "الفريق والصلاحيات",
+    hint: "من يرى ماذا ومن يعدّل ماذا",
+    icon: ShieldCheck,
+    audience: "المالك والمدير",
+  },
 ];
 
 function AvatarBadge({ name, email }: { name?: string; email?: string }) {
@@ -78,6 +87,7 @@ function AvatarBadge({ name, email }: { name?: string; email?: string }) {
 
 function UserMenu() {
   const { user, signOut } = useAuth();
+  const access = useAccess();
   const navigate = useNavigate();
 
   const displayName =
@@ -102,18 +112,25 @@ function UserMenu() {
           </span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-60">
+      <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel className="font-normal">
           <span className="block truncate text-sm font-medium">{displayName}</span>
           <span className="block truncate text-xs text-muted-foreground">
             {user?.email ?? "حساب زائر"}
           </span>
+          <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+            <ShieldCheck className="size-3" />
+            الدور: {access.isReady ? access.label : "جارٍ التحديد…"}
+          </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel className="flex items-center gap-1.5 text-[11px] font-normal text-muted-foreground">
-          <ShieldCheck className="size-3.5" />
-          الوصول موثّق لكل قيد مسجّل في النظام
-        </DropdownMenuLabel>
+        <DropdownMenuItem
+          onClick={() => navigate("/team")}
+          className="cursor-pointer"
+        >
+          <Users className="size-4" />
+          الفريق والصلاحيات
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={handleSignOut}

@@ -15,6 +15,7 @@ const AuthPage = lazy(() => import("./pages/Auth.tsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const Production = lazy(() => import("./pages/Production.tsx"));
 const SystemMap = lazy(() => import("./pages/SystemMap.tsx"));
+const Team = lazy(() => import("./pages/Team.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 // Simple loading fallback for route transitions
@@ -147,6 +148,14 @@ createRoot(document.getElementById("root")!).render(
                 element={
                   <RequireAuth>
                     <SystemMap />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/team"
+                element={
+                  <RequireAuth>
+                    <Team />
                   </RequireAuth>
                 }
               />
