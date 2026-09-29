@@ -1,0 +1,17 @@
+{
+  "name": "IConcrete — إدارة محطات الخرسانة الجاهزة",
+  "short_name": "IConcrete",
+  "description": "لوحة الإنتاج والكميات اليومية ومؤشرات الأرباح والخسائر لمحطات الخرسانة الجاهزة",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f8fa",
+  "theme_color": "#1d2530",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
