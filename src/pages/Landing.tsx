@@ -614,28 +614,28 @@ export default function Landing() {
       {/* Principles */}
       <section id="principles" className="border-y border-border/60 bg-card/60">
         <div className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
-        <SectionTitle
-          index="06"
-          eyebrow="مبادئ النظام"
-          title="قواعد ثابتة في كل وحدة"
-          description="تُطبَّق على ما يعمل الآن، وتُلزم كل وحدة قادمة بالبناء عليها."
-        />
-        <div className="mt-12 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-          {SYSTEM_PRINCIPLES.map((item) => (
-            <div
-              key={item.title}
-              className="rounded-2xl border border-border/70 bg-background p-5"
-            >
-              <span className="grid size-10 place-items-center rounded-xl bg-brand/15 text-brand">
-                <item.icon className="size-5" />
-              </span>
-              <p className="mt-3.5 text-sm font-semibold">{item.title}</p>
-              <p className="mt-1.5 text-[11px] leading-5 text-muted-foreground">
-                {item.body}
-              </p>
-            </div>
-          ))}
-        </div>
+          <SectionTitle
+            index="06"
+            eyebrow="مبادئ النظام"
+            title="قواعد ثابتة في كل وحدة"
+            description="تُطبَّق على ما يعمل الآن، وتُلزم كل وحدة قادمة بالبناء عليها."
+          />
+          <div className="mt-12 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+            {SYSTEM_PRINCIPLES.map((item) => (
+              <div
+                key={item.title}
+                className="rounded-2xl border border-border/70 bg-background p-5"
+              >
+                <span className="grid size-10 place-items-center rounded-xl bg-brand/15 text-brand">
+                  <item.icon className="size-5" />
+                </span>
+                <p className="mt-3.5 text-sm font-semibold">{item.title}</p>
+                <p className="mt-1.5 text-[11px] leading-5 text-muted-foreground">
+                  {item.body}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
