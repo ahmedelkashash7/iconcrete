@@ -375,6 +375,15 @@ export const SYSTEM_MODULES: ModuleGroup[] = [
         route: "/audit",
       },
       {
+        id: "excel-pack",
+        name: "حزمة Excel / Power Platform",
+        purpose:
+          "نموذج بيانات كامل واستعلامات Power Query ومقاييس DAX ومخطط Azure SQL وقوائم SharePoint وثماني لوحات قيادة، جاهزة للاستيراد.",
+        icon: FileSpreadsheet,
+        availability: "live",
+        route: "/excel-pack",
+      },
+      {
         id: "backup",
         name: "النسخ الاحتياطي والاستعادة",
         purpose: "نسخ دورية تلقائية وخطة استعادة معتمدة للبيانات الحرجة.",

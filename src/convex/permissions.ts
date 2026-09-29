@@ -34,7 +34,8 @@ export type Capability =
   | "manageInventory"
   | "viewForecast"
   | "viewAlerts"
-  | "manageAlerts";
+  | "manageAlerts"
+  | "viewExport";
 
 export const CAPABILITIES: Capability[] = [
   "viewFinancials",
@@ -49,6 +50,7 @@ export const CAPABILITIES: Capability[] = [
   "viewForecast",
   "viewAlerts",
   "manageAlerts",
+  "viewExport",
   "manageSettings",
   "manageBranches",
   "viewTeam",
@@ -88,6 +90,8 @@ export const CAPABILITY_LABELS: Record<Capability, string> = {
   viewForecast: "عرض تنبؤ الطلب وخطة الصيانة",
   viewAlerts: "عرض التنبيهات الذكية وسجل ما أُرسل",
   manageAlerts: "إنشاء وتعديل قواعد التنبيه وحدودها",
+  viewExport:
+    "تنزيل حزمة Excel / Power Platform وربط الطبقة الموحّدة للتصدير",
   manageSettings: "تعديل أسعار الخلطات المعتمدة وبيانات المحطة",
   manageBranches: "إضافة فروع المحطة وتعديل بياناتها",
   viewTeam: "عرض الفريق وأدواره",
@@ -110,6 +114,7 @@ export const ROLE_CAPABILITIES: Record<PlantRole, Capability[]> = {
     "viewForecast",
     "viewAlerts",
     "manageAlerts",
+    "viewExport",
     "manageSettings",
     "viewTeam",
     "viewAudit",
@@ -122,6 +127,7 @@ export const ROLE_CAPABILITIES: Record<PlantRole, Capability[]> = {
     "viewInventory",
     "viewForecast",
     "viewAlerts",
+    "viewExport",
     "viewAudit",
   ],
   operator: [
@@ -151,6 +157,7 @@ export const GUEST_CAPABILITIES: Capability[] = [
   "manageInventory",
   "viewForecast",
   "viewAlerts",
+  "viewExport",
   "viewAudit",
 ];
 

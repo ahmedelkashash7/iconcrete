@@ -27,6 +27,7 @@ import {
   Boxes,
   CalendarDays,
   Factory,
+  FileSpreadsheet,
   FlaskConical,
   LayoutDashboard,
   LogOut,
@@ -99,6 +100,13 @@ const APP_NAV: NavItem[] = [
     hint: "الفروع وأسعار الخلطات المعتمدة",
     icon: Settings2,
     audience: "المالك والمدير",
+  },
+  {
+    to: "/excel-pack",
+    label: "حزمة Excel / Power",
+    hint: "نموذج البيانات و Power Query و DAX ولوحات القيادة",
+    icon: FileSpreadsheet,
+    audience: "الإدارة والتقارير",
   },
   {
     to: "/team",

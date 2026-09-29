@@ -22,6 +22,7 @@ const Inventory = lazy(() => import("./pages/Inventory.tsx"));
 const Forecast = lazy(() => import("./pages/Forecast.tsx"));
 const Alerts = lazy(() => import("./pages/Alerts.tsx"));
 const Settings = lazy(() => import("./pages/Settings.tsx"));
+const ExcelPack = lazy(() => import("./pages/ExcelPack.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 // Simple loading fallback for route transitions
@@ -210,6 +211,14 @@ createRoot(document.getElementById("root")!).render(
                 element={
                   <RequireAuth>
                     <Settings />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/excel-pack"
+                element={
+                  <RequireAuth>
+                    <ExcelPack />
                   </RequireAuth>
                 }
               />
