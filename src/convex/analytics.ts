@@ -105,8 +105,12 @@ export const overview = query({
   args: {
     days: v.number(),
     today: v.optional(v.string()),
+    branchId: v.optional(v.id("branches")),
   },
-  handler: async (ctx, { days: requestedDays, today: requestedToday }) => {
+  handler: async (
+    ctx,
+    { days: requestedDays, today: requestedToday, branchId },
+  ) => {
     const viewer = await requireViewer(ctx);
     const financialsVisible = can(viewer, "viewFinancials");
     const days = Math.min(Math.max(Math.round(requestedDays || 30), 1), 180);
@@ -118,10 +122,13 @@ export const overview = query({
     const prevStart = addDays(start, -days);
     const prevEnd = addDays(start, -1);
 
-    const logs = await ctx.db
+    const fetched = await ctx.db
       .query("productionLogs")
       .withIndex("by_date", (q) => q.gte("date", prevStart).lte("date", today))
       .take(MAX_ROWS);
+    const logs = branchId
+      ? fetched.filter((log) => log.branchId === branchId)
+      : fetched;
 
     const current = new Map<string, Bucket>();
     const previous = new Map<string, Bucket>();
@@ -195,8 +202,19 @@ export const overview = query({
       (a, b) => SHIFT_ORDER.indexOf(a.key as Shift) - SHIFT_ORDER.indexOf(b.key as Shift),
     );
 
+    const plant = (await ctx.db.query("plantSettings").take(1))[0];
+    const capacityM3Day = plant?.capacityM3Day ?? 0;
+
     const response = {
       range: { days, start, end: today, prevStart, prevEnd },
+      branchId: branchId ?? null,
+      capacity: {
+        capacityM3Day,
+        utilisationPct:
+          capacityM3Day > 0
+            ? r2(((totals.deliveredM3 / days) / capacityM3Day) * 100)
+            : 0,
+      },
       financialsVisible,
       totals,
       previous: previousTotals,

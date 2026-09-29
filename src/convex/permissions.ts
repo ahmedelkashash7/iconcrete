@@ -25,7 +25,16 @@ export type Capability =
   | "manageTestData"
   | "viewTeam"
   | "viewAudit"
-  | "manageRoles";
+  | "manageRoles"
+  | "manageSettings"
+  | "manageBranches"
+  | "viewQuality"
+  | "manageQuality"
+  | "viewInventory"
+  | "manageInventory"
+  | "viewForecast"
+  | "viewAlerts"
+  | "manageAlerts";
 
 export const CAPABILITIES: Capability[] = [
   "viewFinancials",
@@ -33,6 +42,15 @@ export const CAPABILITIES: Capability[] = [
   "editLog",
   "deleteLog",
   "manageTestData",
+  "viewQuality",
+  "manageQuality",
+  "viewInventory",
+  "manageInventory",
+  "viewForecast",
+  "viewAlerts",
+  "manageAlerts",
+  "manageSettings",
+  "manageBranches",
   "viewTeam",
   "viewAudit",
   "manageRoles",
@@ -52,9 +70,9 @@ export const ROLE_DESCRIPTIONS: Record<PlantRole, string> = {
   manager:
     "إدارة التشغيل والأرقام المالية والبيانات التجريبية، دون تغيير الأدوار.",
   reviewer:
-    "مراجعة وتصحيح القيود، واطلاع كامل على الأرقام المالية وسجل التتبع.",
+    "مراجعة وتصحيح القيود واختبارات الجودة، واطلاع كامل على الأرقام المالية وسجل التتبع.",
   operator:
-    "إدخال بيانات الوردية وتعديل قيود يومه، دون عرض الأرقام المالية أو الحذف.",
+    "إدخال بيانات الوردية والجودة والمخازن وتعديل قيود يومه، دون عرض الأرقام المالية أو الحذف.",
 };
 
 export const CAPABILITY_LABELS: Record<Capability, string> = {
@@ -63,6 +81,15 @@ export const CAPABILITY_LABELS: Record<Capability, string> = {
   editLog: "تعديل قيد إنتاج قائم",
   deleteLog: "حذف قيد إنتاج",
   manageTestData: "تحميل أو حذف البيانات التجريبية",
+  viewQuality: "عرض اختبارات الجودة (مكعبات الخرسانة والركود)",
+  manageQuality: "تسجيل وتعديل اختبارات الجودة",
+  viewInventory: "عرض أرصدة المخازن وحركة المواد",
+  manageInventory: "تسجيل استلام وصرف المواد وتعديل الأرصدة",
+  viewForecast: "عرض تنبؤ الطلب وخطة الصيانة",
+  viewAlerts: "عرض التنبيهات الذكية وسجل ما أُرسل",
+  manageAlerts: "إنشاء وتعديل قواعد التنبيه وحدودها",
+  manageSettings: "تعديل أسعار الخلطات المعتمدة وبيانات المحطة",
+  manageBranches: "إضافة فروع المحطة وتعديل بياناتها",
   viewTeam: "عرض الفريق وأدواره",
   viewAudit: "عرض سجل التتبع لكل عملية (من عدّل ماذا وبأي قيمة سابقة)",
   manageRoles: "تغيير أدوار الفريق",
@@ -76,11 +103,36 @@ export const ROLE_CAPABILITIES: Record<PlantRole, Capability[]> = {
     "editLog",
     "deleteLog",
     "manageTestData",
+    "viewQuality",
+    "manageQuality",
+    "viewInventory",
+    "manageInventory",
+    "viewForecast",
+    "viewAlerts",
+    "manageAlerts",
+    "manageSettings",
     "viewTeam",
     "viewAudit",
   ],
-  reviewer: ["viewFinancials", "editLog", "viewAudit"],
-  operator: ["createLog", "editLog"],
+  reviewer: [
+    "viewFinancials",
+    "editLog",
+    "viewQuality",
+    "manageQuality",
+    "viewInventory",
+    "viewForecast",
+    "viewAlerts",
+    "viewAudit",
+  ],
+  operator: [
+    "createLog",
+    "editLog",
+    "viewQuality",
+    "manageQuality",
+    "viewInventory",
+    "manageInventory",
+    "viewForecast",
+  ],
 };
 
 /**
@@ -93,6 +145,12 @@ export const GUEST_CAPABILITIES: Capability[] = [
   "createLog",
   "editLog",
   "manageTestData",
+  "viewQuality",
+  "manageQuality",
+  "viewInventory",
+  "manageInventory",
+  "viewForecast",
+  "viewAlerts",
   "viewAudit",
 ];
 

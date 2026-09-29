@@ -185,3 +185,24 @@ export function pctChange(current: number, previous: number): number | null {
   if (!Number.isFinite(previous) || previous === 0) return null;
   return r2(((current - previous) / Math.abs(previous)) * 100);
 }
+
+/**
+ * Deterministic PRNG (mulberry32) used by every demo dataset, so the sample
+ * ledger, the quality samples, the material movements and the equipment list
+ * always line up with each other.
+ */
+export function mulberry32(seed: number) {
+  let a = seed;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Monday-first weekday index (0 = Monday … 6 = Sunday), used by forecasting. */
+export function weekdayIndex(iso: string): number {
+  const day = new Date(`${iso}T00:00:00Z`).getUTCDay(); // 0 = Sunday
+  return (day + 6) % 7;
+}

@@ -83,7 +83,17 @@ export const SYSTEM_MODULES: ModuleGroup[] = [
         purpose:
           "تنبيه تلقائي بالبريد أو الرسائل عند تخطي حد الربح أو نسبة التأخير أو المخزون.",
         icon: ScrollText,
-        availability: "roadmap",
+        availability: "live",
+        route: "/alerts",
+      },
+      {
+        id: "demand-forecast",
+        name: "التنبؤ بالطلب والطاقة",
+        purpose:
+          "توقع الطلب للأسابيع القادمة مع نسبة خطأ معلنة، وتحميل متوقع على طاقة المحطة.",
+        icon: Waypoints,
+        availability: "live",
+        route: "/forecast",
       },
     ],
   },
@@ -118,11 +128,12 @@ export const SYSTEM_MODULES: ModuleGroup[] = [
       },
       {
         id: "mix-library",
-        name: "معايير الخلطات",
+        name: "معايير الخلطات وأسعارها",
         purpose:
-          "مكتبة خلطات معتمدة (ASTM C94 / ECP 203) مع تكلفتها القياسية وهامشها.",
+          "مكتبة خلطات معتمدة (ASTM C94 / ECP 203) مع مقاومتها وتكلفتها القياسية وهامشها.",
         icon: FlaskConical,
-        availability: "roadmap",
+        availability: "live",
+        route: "/settings",
       },
     ],
   },
@@ -176,15 +187,17 @@ export const SYSTEM_MODULES: ModuleGroup[] = [
         purpose:
           "أرصدة الأسمنت والركام والإضافات مع حد إعادة الطلب وتنبيه النقص.",
         icon: Boxes,
-        availability: "roadmap",
+        availability: "live",
+        route: "/inventory",
       },
       {
         id: "consumption",
         name: "أوامر الصرف للخلاطة",
         purpose:
-          "صرف المواد لكل خلطة ومقارنته بالاستهلاك المعياري وكشف الفاقد.",
+          "صرف المواد لكل يوم إنتاج ومقارنته بالاستهلاك المعياري وكشف الفاقد.",
         icon: ClipboardList,
-        availability: "roadmap",
+        availability: "live",
+        route: "/inventory",
       },
       {
         id: "stocktake",
@@ -205,16 +218,18 @@ export const SYSTEM_MODULES: ModuleGroup[] = [
         id: "cube-tests",
         name: "نتائج مكعبات الخرسانة",
         purpose:
-          "مقاومة الضغط بعد 7 و28 يومًا ونسبة النجاح لكل خلطة وكل صبّة.",
+          "مقاومة الضغط بعد 7 و28 يومًا ونسبة المطابقة لكل خلطة وكل صبّة.",
         icon: FlaskConical,
-        availability: "roadmap",
+        availability: "live",
+        route: "/quality",
       },
       {
         id: "slump-tests",
-        name: "اختبارات الركود والمواد",
-        purpose: "التحقق من الركود ونسب الخلط ومطابقة مواد التوريد.",
+        name: "اختبارات الركود",
+        purpose: "التحقق من ركود الخرسانة الطازجة داخل حدود المواصفة قبل الصب.",
         icon: Gauge,
-        availability: "roadmap",
+        availability: "live",
+        route: "/quality",
       },
       {
         id: "non-conformity",
@@ -267,7 +282,8 @@ export const SYSTEM_MODULES: ModuleGroup[] = [
         purpose:
           "جدول صيانة بالعدادات وتاريخ الاستحقاق لكل معدة وتنبيه قبل الموعد.",
         icon: Wrench,
-        availability: "roadmap",
+        availability: "live",
+        route: "/forecast",
       },
       {
         id: "breakdowns",
@@ -322,6 +338,24 @@ export const SYSTEM_MODULES: ModuleGroup[] = [
     summary: "من يرى ماذا ومن يعدّل ماذا، ثم أثر كل تغيير وكيف تُستعاد البيانات.",
     icon: ShieldCheck,
     modules: [
+      {
+        id: "branches",
+        name: "إدارة الفروع",
+        purpose:
+          "تسجيل فروع المحطة ومتابعة الإنتاج والمخازن والصيانة لكل فرع على حدة أو مجمعة.",
+        icon: Layers,
+        availability: "live",
+        route: "/settings",
+      },
+      {
+        id: "plant-settings",
+        name: "أسعار الخلطات وبيانات المحطة",
+        purpose:
+          "قائمة الأسعار والتكاليف المعتمدة وبيانات المحطة التي تُسعّر بها كل قيود الإنتاج.",
+        icon: Cog,
+        availability: "live",
+        route: "/settings",
+      },
       {
         id: "roles",
         name: "الأدوار والصلاحيات",

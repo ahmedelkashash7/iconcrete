@@ -1,16 +1,33 @@
 import { ConvexError, v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { requireCapability, requireViewer } from "./access";
+import { seedAlertRules } from "./alerts";
 import { diffRecords, recordAudit, snapshotRecord } from "./auditLog";
+import { ensureDefaultBranch } from "./branches";
 import { mutation, query } from "./_generated/server";
-import { DATE_RE, MAX_ROWS, addDays, enrichLog, r2, utcToday } from "./measures";
+import type { MutationCtx } from "./_generated/server";
+import {
+  DATE_RE,
+  MAX_ROWS,
+  addDays,
+  enrichLog,
+  mulberry32,
+  r2,
+  utcToday,
+} from "./measures";
+import { seedEquipment } from "./forecast";
+import { seedMaterialMovements, seedMaterials } from "./inventory";
 import { can, canEditLog } from "./permissions";
 import type { Viewer } from "./permissions";
 import { standardPricing } from "./pricing";
+import { seedQualityTests } from "./quality";
+import { loadMixPrices } from "./settings";
 import { logStatusValidator, shiftValidator } from "./schema";
 import type { LogStatus, Shift } from "./schema";
 
 /** Fields shared by create/update so both are validated identically. */
 const logFields = {
+  branchId: v.optional(v.id("branches")),
   date: v.string(),
   shift: shiftValidator,
   mixDesign: v.string(),
@@ -29,6 +46,7 @@ const logFields = {
 };
 
 type LogInput = {
+  branchId?: Id<"branches">;
   date: string;
   shift: Shift;
   mixDesign: string;
@@ -90,15 +108,31 @@ function assertValid(input: LogInput) {
   }
 }
 
-/** Rows for the daily ledger table, enriched with the per-row measures. */
 /**
  * Prices are never typed by roles that cannot see money: the plant's approved
- * price list is applied on the server before the entry is validated.
+ * price list — now stored in `mixPrices` and edited from «إعدادات المحطة» — is
+ * applied on the server before the entry is validated.
  */
-function applyStandardPricing(viewer: Viewer, input: LogInput): LogInput {
+async function applyStandardPricing(
+  ctx: MutationCtx,
+  viewer: Viewer,
+  input: LogInput,
+): Promise<LogInput> {
   if (can(viewer, "viewFinancials")) return input;
-  const preset = standardPricing(input.mixDesign);
+  const prices = await loadMixPrices(ctx);
+  const preset = standardPricing(input.mixDesign, prices);
   return { ...input, pricePerM3: preset.price, costPerM3: preset.cost };
+}
+
+/** Rejects an entry that names a branch which no longer exists. */
+async function resolveBranch(
+  ctx: MutationCtx,
+  branchId: Id<"branches"> | undefined,
+): Promise<Id<"branches"> | undefined> {
+  if (!branchId) return undefined;
+  const branch = await ctx.db.get(branchId);
+  if (!branch) throw new ConvexError("الفرع المختار لم يعد موجودًا");
+  return branchId;
 }
 
 /** Strips every money field from a row before it reaches a restricted role. */
@@ -127,8 +161,9 @@ export const list = query({
   args: {
     from: v.string(),
     to: v.string(),
+    branchId: v.optional(v.id("branches")),
   },
-  handler: async (ctx, { from, to }) => {
+  handler: async (ctx, { from, to, branchId }) => {
     const viewer = await requireViewer(ctx);
     const logs = await ctx.db
       .query("productionLogs")
@@ -136,7 +171,8 @@ export const list = query({
       .order("desc")
       .take(MAX_ROWS);
 
-    const rows = logs.map(enrichLog);
+    const scoped = branchId ? logs.filter((log) => log.branchId === branchId) : logs;
+    const rows = scoped.map(enrichLog);
     const financialsVisible = can(viewer, "viewFinancials");
 
     return {
@@ -150,20 +186,22 @@ export const create = mutation({
   args: logFields,
   handler: async (ctx, fields) => {
     const viewer = await requireCapability(ctx, "createLog");
-    const args = applyStandardPricing(viewer, fields);
-    assertValid(args);
+    const priced = await applyStandardPricing(ctx, viewer, fields);
+    assertValid(priced);
+    const branchId = await resolveBranch(ctx, priced.branchId);
     const record = {
-      ...args,
-      customer: args.customer.trim(),
-      mixDesign: args.mixDesign.trim(),
-      site: args.site?.trim() || undefined,
-      orderRef: args.orderRef?.trim() || undefined,
-      notes: args.notes?.trim() || undefined,
-      quantityM3: r2(args.quantityM3),
-      deliveredM3: r2(args.deliveredM3),
-      returnedM3: r2(args.returnedM3),
-      pricePerM3: r2(args.pricePerM3),
-      costPerM3: r2(args.costPerM3),
+      ...priced,
+      branchId,
+      customer: priced.customer.trim(),
+      mixDesign: priced.mixDesign.trim(),
+      site: priced.site?.trim() || undefined,
+      orderRef: priced.orderRef?.trim() || undefined,
+      notes: priced.notes?.trim() || undefined,
+      quantityM3: r2(priced.quantityM3),
+      deliveredM3: r2(priced.deliveredM3),
+      returnedM3: r2(priced.returnedM3),
+      pricePerM3: r2(priced.pricePerM3),
+      costPerM3: r2(priced.costPerM3),
       isTestData: false,
       createdBy: viewer.userId,
     };
@@ -194,20 +232,22 @@ export const update = mutation({
       );
     }
 
-    const args = applyStandardPricing(viewer, fields);
-    assertValid(args);
+    const priced = await applyStandardPricing(ctx, viewer, fields);
+    assertValid(priced);
+    const branchId = await resolveBranch(ctx, priced.branchId ?? existing.branchId);
     const next = {
-      ...args,
-      customer: args.customer.trim(),
-      mixDesign: args.mixDesign.trim(),
-      site: args.site?.trim() || undefined,
-      orderRef: args.orderRef?.trim() || undefined,
-      notes: args.notes?.trim() || undefined,
-      quantityM3: r2(args.quantityM3),
-      deliveredM3: r2(args.deliveredM3),
-      returnedM3: r2(args.returnedM3),
-      pricePerM3: r2(args.pricePerM3),
-      costPerM3: r2(args.costPerM3),
+      ...priced,
+      branchId,
+      customer: priced.customer.trim(),
+      mixDesign: priced.mixDesign.trim(),
+      site: priced.site?.trim() || undefined,
+      orderRef: priced.orderRef?.trim() || undefined,
+      notes: priced.notes?.trim() || undefined,
+      quantityM3: r2(priced.quantityM3),
+      deliveredM3: r2(priced.deliveredM3),
+      returnedM3: r2(priced.returnedM3),
+      pricePerM3: r2(priced.pricePerM3),
+      costPerM3: r2(priced.costPerM3),
     };
     await ctx.db.patch(id, next);
     const changes = diffRecords(existing, { ...existing, ...next });
@@ -242,27 +282,44 @@ export const remove = mutation({
   },
 });
 
-/** Purges only rows carrying Test_Data_Flag — real entries are never touched. */
+/**
+ * Purges only rows carrying Test_Data_Flag — real entries are never touched.
+ * Master data (the material list, the fleet, the approved prices and the alert
+ * rules) is configuration, so it survives the purge.
+ */
 export const clearTestData = mutation({
   args: {},
   handler: async (ctx) => {
     const viewer = await requireCapability(ctx, "manageTestData");
-    const rows = await ctx.db
-      .query("productionLogs")
-      .withIndex("by_date")
-      .take(MAX_ROWS);
-    const testRows = rows.filter((row) => row.isTestData);
-    for (const row of testRows) {
+
+    const logs = await ctx.db.query("productionLogs").withIndex("by_date").take(MAX_ROWS);
+    const testLogs = logs.filter((row) => row.isTestData);
+    for (const row of testLogs) {
       await ctx.db.delete(row._id);
     }
+
+    const tests = await ctx.db.query("qualityTests").withIndex("by_date").take(MAX_ROWS);
+    const testTests = tests.filter((row) => row.isTestData);
+    for (const row of testTests) {
+      await ctx.db.delete(row._id);
+    }
+
+    const movements = (await ctx.db.query("materialMovements").take(MAX_ROWS)).filter(
+      (row) => row.isTestData,
+    );
+    for (const row of movements) {
+      await ctx.db.delete(row._id);
+    }
+
+    const total = testLogs.length + testTests.length + movements.length;
     await recordAudit(ctx, {
       actorId: viewer.userId,
       action: "purge",
       entity: "productionLogs",
-      label: `${testRows.length} قيد تجريبي`,
+      label: `${testLogs.length} قيد · ${testTests.length} اختبار جودة · ${movements.length} حركة مخزون`,
       changes: [],
     });
-    return testRows.length;
+    return total;
   },
 });
 
@@ -300,31 +357,26 @@ const SITES = [
 
 const SHIFTS: Shift[] = ["morning", "evening", "night"];
 
-/** Deterministic PRNG so the demo ledger always looks the same. */
-function mulberry32(seed: number) {
-  let a = seed;
-  return () => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
+/**
+ * Seeds the demo estate one layer at a time, so the button also repairs a
+ * deployment that already holds an older demo ledger: the ledger is only
+ * generated when the plant is empty, and the quality samples, stores, fleet and
+ * alert rules are filled in whenever their own table is still empty.
+ */
 export const seedDemoData = mutation({
   args: { today: v.optional(v.string()) },
   handler: async (ctx, { today }) => {
     const viewer = await requireCapability(ctx, "manageTestData");
-    const existing = await ctx.db.query("productionLogs").take(1);
-    if (existing.length > 0) {
-      return { inserted: 0, skipped: true };
-    }
-
     const anchor = today && DATE_RE.test(today) ? today : utcToday();
+    const branchId = await ensureDefaultBranch(ctx, viewer.userId);
     const random = mulberry32(20260929);
     const rows: Array<LogInput & { isTestData: boolean }> = [];
+    const existingLogs = await ctx.db
+      .query("productionLogs")
+      .withIndex("by_date")
+      .take(MAX_ROWS);
 
-    for (let offset = 89; offset >= 0; offset -= 1) {
+    for (let offset = existingLogs.length === 0 ? 89 : -1; offset >= 0; offset -= 1) {
       const date = addDays(anchor, -offset);
       const weekday = new Date(`${date}T00:00:00Z`).getUTCDay(); // 5 = Friday (weekend)
       const monthFactor = 1 + 0.06 * Math.sin((offset / 30) * Math.PI);
@@ -345,7 +397,8 @@ export const seedDemoData = mutation({
         const site = SITES[Math.floor(random() * SITES.length)];
 
         const quantity = Math.round((34 + random() * 108) * monthFactor);
-        const returned = random() < 0.34 ? Math.round(quantity * (0.01 + random() * 0.07)) : 0;
+        const returned =
+          random() < 0.34 ? Math.round(quantity * (0.01 + random() * 0.07)) : 0;
         const delivered = Math.max(1, quantity - returned);
         const price = mix.price * (disruptedDay ? 0.9 : 0.94 + random() * 0.11);
         // A hard pour (long haul, pump waiting, night shift) carries extra cost,
@@ -365,6 +418,7 @@ export const seedDemoData = mutation({
               : "delivered";
 
         rows.push({
+          branchId,
           date,
           shift,
           mixDesign: mix.name,
@@ -395,14 +449,87 @@ export const seedDemoData = mutation({
       await ctx.db.insert("productionLogs", row);
     }
 
-    await recordAudit(ctx, {
-      actorId: viewer.userId,
-      action: "seed",
-      entity: "productionLogs",
-      label: `${rows.length} قيد تجريبي`,
-      changes: [],
-    });
+    const logs =
+      rows.length > 0
+        ? await ctx.db.query("productionLogs").withIndex("by_date").take(MAX_ROWS)
+        : existingLogs;
 
-    return { inserted: rows.length, skipped: false };
+    const dailyProductionM3 = new Map<string, number>();
+    for (const log of logs) {
+      if (log.status === "cancelled") continue;
+      dailyProductionM3.set(
+        log.date,
+        (dailyProductionM3.get(log.date) ?? 0) + log.deliveredM3,
+      );
+    }
+
+    // Everything else is derived from the same pours, so quality samples,
+    // material consumption and the maintenance clock all line up.
+    let quality = 0;
+    if ((await ctx.db.query("qualityTests").take(1)).length === 0) {
+      quality = await seedQualityTests(
+        ctx,
+        branchId,
+        logs.map((log) => ({
+          date: log.date,
+          mixDesign: log.mixDesign,
+          customer: log.customer,
+          site: log.site ?? undefined,
+          orderRef: log.orderRef ?? undefined,
+        })),
+        anchor,
+        20260930,
+      );
+    }
+
+    const materialIds = await seedMaterials(ctx, branchId);
+    let movements = 0;
+    if ((await ctx.db.query("materialMovements").take(1)).length === 0) {
+      movements = await seedMaterialMovements(
+        ctx,
+        branchId,
+        materialIds,
+        dailyProductionM3,
+        anchor,
+        20260931,
+      );
+    }
+
+    let equipment = 0;
+    if ((await ctx.db.query("equipment").take(1)).length === 0) {
+      equipment = await seedEquipment(ctx, branchId, anchor, 20260932);
+    }
+
+    let rules = 0;
+    if ((await ctx.db.query("alertRules").take(1)).length === 0) {
+      const plant = (await ctx.db.query("plantSettings").take(1))[0];
+      const owner = await ctx.db.get(viewer.userId);
+      const recipients = plant?.alertEmail
+        ? [plant.alertEmail]
+        : owner?.email
+          ? [owner.email]
+          : [];
+      rules = await seedAlertRules(ctx, viewer.userId, recipients);
+    }
+
+    if (rows.length > 0 || quality > 0 || movements > 0) {
+      await recordAudit(ctx, {
+        actorId: viewer.userId,
+        action: "seed",
+        entity: "productionLogs",
+        label: `${rows.length} قيد · ${quality} اختبار جودة · ${movements} حركة مخزون · ${equipment} معدة`,
+        changes: [],
+      });
+    }
+
+    return {
+      inserted: rows.length,
+      skipped: rows.length === 0,
+      quality,
+      movements,
+      equipment,
+      rules,
+      materials: materialIds.size,
+    };
   },
 });

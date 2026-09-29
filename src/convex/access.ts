@@ -2,7 +2,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError } from "convex/values";
 import { recordAudit } from "./auditLog";
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalQuery, mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -48,6 +48,19 @@ export async function requireCapability(
 }
 
 const MAX_USERS = 300;
+
+/**
+ * Capability gate for actions and cron jobs, which cannot call `requireCapability`
+ * directly: they run outside the query/mutation context, so they hop through
+ * this internal query instead.
+ */
+export const assertCapability = internalQuery({
+  args: { capability: v.string() },
+  handler: async (ctx, { capability }) => {
+    await requireCapability(ctx, capability as Capability);
+    return true;
+  },
+});
 
 /**
  * Assigns a role to a member the first time they open the system.
