@@ -74,7 +74,7 @@ import {
   Trash2,
   TriangleAlert,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 const RANGES = [
@@ -121,6 +121,7 @@ type MaterialOption = {
   openingQty: number;
   reorderLevel: number;
   standardCost: number;
+  isActive: boolean;
 };
 
 function MaterialDialog({
@@ -139,26 +140,21 @@ function MaterialDialog({
   const create = useMutation(api.inventory.createMaterial);
   const update = useMutation(api.inventory.updateMaterial);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<MaterialForm>(emptyMaterial);
-
-  useEffect(() => {
-    if (!open) return;
-    setForm(
-      material
-        ? {
-            name: material.name,
-            category: material.category,
-            unit: material.unit,
-            openingQty: String(material.openingQty),
-            reorderLevel: String(material.reorderLevel),
-            standardCost: String(material.standardCost),
-            supplier: material.supplier ?? "",
-            isActive: material.isActive,
-          }
-        : emptyMaterial,
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, material]);
+  // Seeded once per mount; the parent mounts a fresh dialog for each record.
+  const [form, setForm] = useState<MaterialForm>(() =>
+    material
+      ? {
+          name: material.name,
+          category: material.category,
+          unit: material.unit,
+          openingQty: String(material.openingQty),
+          reorderLevel: String(material.reorderLevel),
+          standardCost: String(material.standardCost),
+          supplier: material.supplier ?? "",
+          isActive: material.isActive,
+        }
+      : emptyMaterial,
+  );
 
   const set = <K extends keyof MaterialForm>(key: K, value: MaterialForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -971,13 +967,15 @@ export default function Inventory() {
         </div>
       )}
 
-      <MaterialDialog
-        open={materialDialog.open}
-        onOpenChange={(open) => setMaterialDialog((prev) => ({ ...prev, open }))}
-        material={materialDialog.material}
-        branchId={branchId}
-        financialsVisible={financialsVisible}
-      />
+      {materialDialog.open && (
+        <MaterialDialog
+          open
+          onOpenChange={(open) => setMaterialDialog((prev) => ({ ...prev, open }))}
+          material={materialDialog.material}
+          branchId={branchId}
+          financialsVisible={financialsVisible}
+        />
+      )}
       <MovementDialog
         open={movementOpen}
         onOpenChange={setMovementOpen}

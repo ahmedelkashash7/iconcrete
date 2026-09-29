@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/AppShell";
+import { BranchFilter } from "@/components/BranchFilter";
 import { Panel } from "@/components/Panel";
 import { ProductionFormDialog } from "@/components/ProductionFormDialog";
 import { RoleNotice } from "@/components/RoleNotice";
@@ -38,6 +39,7 @@ import { accumulate, emptyBucket, summarize } from "@/convex/measures";
 import type { Bucket, EnrichedLog } from "@/convex/measures";
 import { canEditLog } from "@/convex/permissions";
 import { useAccess } from "@/hooks/use-access";
+import { useBranch } from "@/hooks/use-branch";
 import { downloadCsv } from "@/lib/csv";
 import {
   MIX_NAMES,
@@ -127,13 +129,14 @@ export default function Production() {
   const [pendingDelete, setPendingDelete] = useState<EnrichedLog | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+  const { branches, branchId, setBranchId } = useBranch();
 
   const range =
     rangeKey === "custom"
       ? { from: customFrom, to: customTo }
       : { from: windowStartISO(Number(rangeKey), today), to: today };
 
-  const ledger = useQuery(api.production.list, range);
+  const ledger = useQuery(api.production.list, { ...range, branchId });
   const allRows = ledger?.rows;
   const removeLog = useMutation(api.production.remove);
   // Hold the skeleton until the role is resolved so restricted roles never
@@ -230,6 +233,7 @@ export default function Production() {
 
   const actions = (
     <>
+      <BranchFilter branches={branches} value={branchId} onChange={setBranchId} />
       <Button
         variant="outline"
         onClick={handleExport}
@@ -757,6 +761,8 @@ export default function Production() {
         onOpenChange={closeDialog}
         log={dialogOpen ? editing : null}
         defaultDate={range.to}
+        branches={branches}
+        defaultBranchId={branchId}
       />
 
       <AlertDialog

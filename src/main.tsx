@@ -17,6 +17,11 @@ const Production = lazy(() => import("./pages/Production.tsx"));
 const SystemMap = lazy(() => import("./pages/SystemMap.tsx"));
 const Team = lazy(() => import("./pages/Team.tsx"));
 const Audit = lazy(() => import("./pages/Audit.tsx"));
+const Quality = lazy(() => import("./pages/Quality.tsx"));
+const Inventory = lazy(() => import("./pages/Inventory.tsx"));
+const Forecast = lazy(() => import("./pages/Forecast.tsx"));
+const Alerts = lazy(() => import("./pages/Alerts.tsx"));
+const Settings = lazy(() => import("./pages/Settings.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 // Simple loading fallback for route transitions
@@ -165,6 +170,46 @@ createRoot(document.getElementById("root")!).render(
                 element={
                   <RequireAuth>
                     <Audit />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/quality"
+                element={
+                  <RequireAuth>
+                    <Quality />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/inventory"
+                element={
+                  <RequireAuth>
+                    <Inventory />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/forecast"
+                element={
+                  <RequireAuth>
+                    <Forecast />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/alerts"
+                element={
+                  <RequireAuth>
+                    <Alerts />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/settings"
+                element={
+                  <RequireAuth>
+                    <Settings />
                   </RequireAuth>
                 }
               />

@@ -75,7 +75,7 @@ import {
   Trash2,
   TriangleAlert,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
 
@@ -148,59 +148,40 @@ function TestDialog({
   const create = useMutation(api.quality.create);
   const update = useMutation(api.quality.update);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<TestForm>(() => ({
-    date: todayISO(),
-    kind: "cube28",
-    mixDesign: mixNames[0] ?? "C30/37",
-    customer: defaults.customer,
-    site: defaults.site,
-    orderRef: "",
-    sampleRef: "",
-    labName: "معمل المحطة",
-    targetValue: "",
-    tolerance: String(DEFAULT_SLUMP_TOLERANCE_MM),
-    actualValue: "",
-    testedBy: "",
-    notes: "",
-  }));
-  // Re-seed the form whenever the dialog opens on a different record.
-  useEffect(() => {
-    if (!open) return;
-    setForm(
-        test
-          ? {
-              date: test.date,
-              kind: test.kind,
-              mixDesign: test.mixDesign,
-              customer: test.customer,
-              site: test.site ?? "",
-              orderRef: test.orderRef ?? "",
-              sampleRef: test.sampleRef ?? "",
-              labName: test.labName ?? "",
-              targetValue: String(test.targetValue),
-              tolerance: String(test.tolerance ?? DEFAULT_SLUMP_TOLERANCE_MM),
-              actualValue: String(test.actualValue),
-              testedBy: test.testedBy ?? "",
-              notes: test.notes ?? "",
-            }
-          : {
-              date: todayISO(),
-              kind: "cube28",
-              mixDesign: mixNames[0] ?? "C30/37",
-              customer: defaults.customer,
-              site: defaults.site,
-              orderRef: "",
-              sampleRef: "",
-              labName: "معمل المحطة",
-              targetValue: "",
-              tolerance: String(DEFAULT_SLUMP_TOLERANCE_MM),
-              actualValue: "",
-              testedBy: "",
-              notes: "",
-            },
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, test]);
+  // Seeded once per mount; the parent mounts a fresh dialog for each record.
+  const [form, setForm] = useState<TestForm>(() =>
+    test
+      ? {
+          date: test.date,
+          kind: test.kind,
+          mixDesign: test.mixDesign,
+          customer: test.customer,
+          site: test.site ?? "",
+          orderRef: test.orderRef ?? "",
+          sampleRef: test.sampleRef ?? "",
+          labName: test.labName ?? "",
+          targetValue: String(test.targetValue),
+          tolerance: String(test.tolerance ?? DEFAULT_SLUMP_TOLERANCE_MM),
+          actualValue: String(test.actualValue),
+          testedBy: test.testedBy ?? "",
+          notes: test.notes ?? "",
+        }
+      : {
+          date: todayISO(),
+          kind: "cube28",
+          mixDesign: mixNames[0] ?? "C30/37",
+          customer: defaults.customer,
+          site: defaults.site,
+          orderRef: "",
+          sampleRef: "",
+          labName: "معمل المحطة",
+          targetValue: "",
+          tolerance: String(DEFAULT_SLUMP_TOLERANCE_MM),
+          actualValue: "",
+          testedBy: "",
+          notes: "",
+        },
+  );
 
   const set = <K extends keyof TestForm>(key: K, value: TestForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -907,14 +888,16 @@ export default function Quality() {
         </div>
       )}
 
-      <TestDialog
-        open={dialog.open}
-        onOpenChange={(open) => setDialog((prev) => ({ ...prev, open }))}
-        test={dialog.test}
-        mixNames={mixNames}
-        branchId={branchId}
-        defaults={{ customer: "", site: "" }}
-      />
+      {dialog.open && (
+        <TestDialog
+          open
+          onOpenChange={(open) => setDialog((prev) => ({ ...prev, open }))}
+          test={dialog.test}
+          mixNames={mixNames}
+          branchId={branchId}
+          defaults={{ customer: "", site: "" }}
+        />
+      )}
     </AppShell>
   );
 }

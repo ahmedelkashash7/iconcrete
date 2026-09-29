@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/AppShell";
+import { BranchFilter } from "@/components/BranchFilter";
 import { KpiCard } from "@/components/KpiCard";
 import { Panel } from "@/components/Panel";
 import { RoleNotice } from "@/components/RoleNotice";
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import { api } from "@/convex/_generated/api";
 import { useAccess } from "@/hooks/use-access";
+import { useBranch } from "@/hooks/use-branch";
 import { downloadCsv } from "@/lib/csv";
 import {
   SHIFT_SHORT_LABELS,
@@ -172,7 +174,8 @@ export default function Dashboard() {
   const access = useAccess();
   const financialsVisible = access.can("viewFinancials");
   const canManageTestData = access.can("manageTestData");
-  const data = useQuery(api.analytics.overview, { days, today });
+  const { branches, branchId, setBranchId } = useBranch();
+  const data = useQuery(api.analytics.overview, { days, today, branchId });
   const seedDemoData = useMutation(api.production.seedDemoData);
   const clearTestData = useMutation(api.production.clearTestData);
   const navigate = useNavigate();
@@ -203,10 +206,13 @@ export default function Dashboard() {
     setIsSeeding(true);
     try {
       const result = await seedDemoData({ today });
+      const added = result.quality + result.movements + result.equipment;
       toast.success(
         result.inserted > 0
-          ? `تم تحميل ${formatNumber(result.inserted)} قيد إنتاج تجريبي`
-          : "توجد بيانات بالفعل على المحطة",
+          ? `تم تحميل ${formatNumber(result.inserted)} قيد إنتاج تجريبي مع بيانات الجودة والمخازن والصيانة`
+          : added > 0
+            ? `تم استكمال البيانات التجريبية: ${formatNumber(result.quality)} اختبار جودة و${formatNumber(result.movements)} حركة مخزون`
+            : "توجد بيانات تجريبية كاملة بالفعل على المحطة",
       );
     } catch (error) {
       toast.error(readError(error, "تعذر تحميل البيانات التجريبية"));
@@ -623,7 +629,12 @@ export default function Dashboard() {
       )} يومًا (${formatDay(data.range.start)} — ${formatDay(
         data.range.end,
       )})، محسوب من قيود الإنتاج. دورك الحالي: ${access.label}.`}
-      actions={actions}
+      actions={
+        <>
+          <BranchFilter branches={branches} value={branchId} onChange={setBranchId} />
+          {actions}
+        </>
+      }
     >
       {data.testDataCount > 0 && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning/40 bg-warning/10 px-4 py-3">

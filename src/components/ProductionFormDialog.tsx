@@ -19,7 +19,9 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import type { EnrichedLog } from "@/convex/measures";
+import type { BranchOption } from "@/hooks/use-branch";
 import {
   MIX_NAMES,
   MIX_PRESETS,
@@ -48,6 +50,7 @@ import type { FormEvent, ReactNode } from "react";
 import { toast } from "sonner";
 
 type FormState = {
+  branchId: string;
   date: string;
   shift: Shift;
   mixDesign: string;
@@ -73,9 +76,11 @@ const toNumber = (value: string) => {
 function buildInitialState(
   log: EnrichedLog | null | undefined,
   defaultDate: string,
+  defaultBranchId: string,
 ): FormState {
   if (log) {
     return {
+      branchId: log.branchId ?? defaultBranchId,
       date: log.date,
       shift: log.shift as Shift,
       mixDesign: log.mixDesign,
@@ -96,6 +101,7 @@ function buildInitialState(
 
   const preset = MIX_PRESETS[0];
   return {
+    branchId: defaultBranchId,
     date: defaultDate,
     shift: "morning",
     mixDesign: preset.name,
@@ -137,10 +143,14 @@ function FormRow({
 function ProductionForm({
   log,
   defaultDate,
+  defaultBranchId,
+  branches,
   onDone,
 }: {
   log?: EnrichedLog | null;
   defaultDate: string;
+  defaultBranchId: string;
+  branches: BranchOption[];
   onDone: () => void;
 }) {
   const access = useAccess();
@@ -148,7 +158,7 @@ function ProductionForm({
   const createLog = useMutation(api.production.create);
   const updateLog = useMutation(api.production.update);
   const [form, setForm] = useState<FormState>(() =>
-    buildInitialState(log, defaultDate),
+    buildInitialState(log, defaultDate, defaultBranchId),
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -222,6 +232,7 @@ function ProductionForm({
     setSaving(true);
     try {
       const payload = {
+        branchId: form.branchId ? (form.branchId as Id<"branches">) : undefined,
         date: form.date,
         shift: form.shift,
         mixDesign: form.mixDesign.trim(),
@@ -258,6 +269,30 @@ function ProductionForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2">
+        {branches.length > 1 && (
+          <FormRow
+            label="الفرع"
+            hint="يحدد الفرع الذي يُحتسب عليه الإيراد والكمية."
+            className="sm:col-span-2"
+          >
+            <Select
+              value={form.branchId}
+              onValueChange={(value) => set("branchId", value)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="اختر الفرع" />
+              </SelectTrigger>
+              <SelectContent>
+                {branches.map((branch) => (
+                  <SelectItem key={branch._id} value={branch._id}>
+                    {branch.name} ({branch.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FormRow>
+        )}
+
         <FormRow label="التاريخ">
           <Input
             type="date"
@@ -544,12 +579,15 @@ export function ProductionFormDialog({
   onOpenChange,
   log,
   defaultDate = todayISO(),
+  branches = [],
+  defaultBranchId = "",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   log?: EnrichedLog | null;
   defaultDate?: string;
-}) {
+  branches?: BranchOption[];
+  defaultBranchId?: string;}) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
@@ -564,6 +602,8 @@ export function ProductionFormDialog({
         <ProductionForm
           log={log}
           defaultDate={defaultDate}
+          defaultBranchId={defaultBranchId}
+          branches={branches}
           onDone={() => onOpenChange(false)}
         />
       </DialogContent>

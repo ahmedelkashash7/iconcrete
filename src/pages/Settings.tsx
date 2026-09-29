@@ -43,7 +43,7 @@ import {
   Settings2,
   Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 /* ------------------------------------------------------------------ */
@@ -96,27 +96,22 @@ function BranchDialog({
 }) {
   const create = useMutation(api.branches.create);
   const update = useMutation(api.branches.update);
-  const [form, setForm] = useState<BranchForm>(emptyBranch);
+  const [form, setForm] = useState<BranchForm>(() =>
+    branch
+      ? {
+          code: branch.code,
+          name: branch.name,
+          city: branch.city ?? "",
+          address: branch.address ?? "",
+          managerName: branch.managerName ?? "",
+          phone: branch.phone ?? "",
+          capacityM3Day: String(branch.capacityM3Day),
+          isActive: branch.isActive,
+          notes: branch.notes ?? "",
+        }
+      : emptyBranch,
+  );
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setForm(
-      branch
-        ? {
-            code: branch.code,
-            name: branch.name,
-            city: branch.city ?? "",
-            address: branch.address ?? "",
-            managerName: branch.managerName ?? "",
-            phone: branch.phone ?? "",
-            capacityM3Day: String(branch.capacityM3Day),
-            isActive: branch.isActive,
-            notes: branch.notes ?? "",
-          }
-        : emptyBranch,
-    );
-  }, [open, branch]);
 
   const set = <K extends keyof BranchForm>(key: K, value: BranchForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -297,25 +292,20 @@ function MixDialog({
   } | null;
 }) {
   const upsert = useMutation(api.settings.upsertMix);
-  const [form, setForm] = useState<MixForm>(emptyMix);
+  const [form, setForm] = useState<MixForm>(() =>
+    mix
+      ? {
+          name: mix.name,
+          price: String(mix.price),
+          cost: String(mix.cost),
+          strengthMpa: String(mix.strengthMpa),
+          cementKgPerM3: mix.cementKgPerM3 ? String(mix.cementKgPerM3) : "",
+          notes: mix.notes ?? "",
+          isActive: mix.isActive,
+        }
+      : emptyMix,
+  );
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setForm(
-      mix
-        ? {
-            name: mix.name,
-            price: String(mix.price),
-            cost: String(mix.cost),
-            strengthMpa: String(mix.strengthMpa),
-            cementKgPerM3: mix.cementKgPerM3 ? String(mix.cementKgPerM3) : "",
-            notes: mix.notes ?? "",
-            isActive: mix.isActive,
-          }
-        : emptyMix,
-    );
-  }, [open, mix]);
 
   const set = <K extends keyof MixForm>(key: K, value: MixForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -454,6 +444,158 @@ function MixDialog({
   );
 }
 
+type PlantRecord = {
+  plantName: string;
+  legalName: string | null;
+  taxId: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  currency: string;
+  capacityM3Day: number;
+  alertEmail: string | null;
+  alertPhone: string | null;
+  updatedAt: number | null;
+};
+
+/**
+ * Plant identity form. Mounted once per server revision (keyed by `updatedAt`),
+ * so the draft is seeded exactly once and follows saved values afterwards.
+ */
+function PlantPanel({ plant, canManage }: { plant: PlantRecord; canManage: boolean }) {
+  const updatePlant = useMutation(api.settings.updatePlant);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState(() => ({
+    plantName: plant.plantName,
+    legalName: plant.legalName ?? "",
+    taxId: plant.taxId ?? "",
+    phone: plant.phone ?? "",
+    email: plant.email ?? "",
+    address: plant.address ?? "",
+    currency: plant.currency,
+    capacityM3Day: String(plant.capacityM3Day),
+    alertEmail: plant.alertEmail ?? "",
+    alertPhone: plant.alertPhone ?? "",
+  }));
+
+  const set = (patch: Partial<typeof form>) => setForm((prev) => ({ ...prev, ...patch }));
+
+  const submit = async () => {
+    setSaving(true);
+    try {
+      await updatePlant({
+        plantName: form.plantName.trim(),
+        legalName: form.legalName.trim() || undefined,
+        taxId: form.taxId.trim() || undefined,
+        phone: form.phone.trim() || undefined,
+        email: form.email.trim() || undefined,
+        address: form.address.trim() || undefined,
+        currency: form.currency.trim() || "EGP",
+        capacityM3Day: Number(form.capacityM3Day) || 0,
+        alertEmail: form.alertEmail.trim() || undefined,
+        alertPhone: form.alertPhone.trim() || undefined,
+      });
+      toast.success("تم حفظ بيانات المحطة");
+    } catch (error) {
+      toast.error(readError(error, "تعذر حفظ بيانات المحطة"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Panel
+      title="بيانات المحطة"
+      description="تُستخدم في التقارير المطبوعة وفي تحديد مستلمي التنبيهات وطاقة المحطة اليومية."
+      action={
+        canManage ? (
+          <Button size="sm" onClick={submit} disabled={saving}>
+            {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            حفظ البيانات
+          </Button>
+        ) : undefined
+      }
+    >
+      {!canManage ? (
+        <RoleNotice
+          icon={Lock}
+          title="عرض فقط"
+          message="تعديل بيانات المحطة وأسعار الخلطات متاح للمالك والمدير."
+        />
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">اسم المحطة</Label>
+            <Input
+              value={form.plantName}
+              onChange={(event) => set({ plantName: event.target.value })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">الاسم القانوني</Label>
+            <Input
+              value={form.legalName}
+              onChange={(event) => set({ legalName: event.target.value })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">الرقم الضريبي</Label>
+            <Input value={form.taxId} onChange={(event) => set({ taxId: event.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">الهاتف</Label>
+            <Input value={form.phone} onChange={(event) => set({ phone: event.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">البريد الإلكتروني</Label>
+            <Input value={form.email} onChange={(event) => set({ email: event.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">العنوان</Label>
+            <Input value={form.address} onChange={(event) => set({ address: event.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">العملة</Label>
+            <Input value={form.currency} onChange={(event) => set({ currency: event.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">الطاقة الإنتاجية (م³/يوم)</Label>
+            <Input
+              type="number"
+              min="1"
+              inputMode="numeric"
+              value={form.capacityM3Day}
+              onChange={(event) => set({ capacityM3Day: event.target.value })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">بريد مستلمي التنبيهات</Label>
+            <Input
+              value={form.alertEmail}
+              onChange={(event) => set({ alertEmail: event.target.value })}
+              placeholder="owner@company.com"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">جوال التنبيهات</Label>
+            <Input
+              value={form.alertPhone}
+              onChange={(event) => set({ alertPhone: event.target.value })}
+              placeholder="+201000000000"
+            />
+          </div>
+          {plant.updatedAt && (
+            <p className="text-[11px] text-muted-foreground sm:col-span-2">
+              <Settings2 className="me-1 inline size-3" />
+              آخر تحديث: {formatFullDate(new Date(plant.updatedAt).toISOString().slice(0, 10))}
+            </p>
+          )}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
@@ -462,7 +604,6 @@ export default function Settings() {
   const access = useAccess();
   const { branches } = useBranch();
   const data = useQuery(api.settings.get);
-  const updatePlant = useMutation(api.settings.updatePlant);
   const removeBranch = useMutation(api.branches.remove);
   const removeMix = useMutation(api.settings.removeMix);
 
@@ -478,62 +619,9 @@ export default function Settings() {
     mix: NonNullable<typeof data>["mixes"][number] | null;
   }>({ open: false, mix: null });
 
-  const [plant, setPlant] = useState({
-    plantName: "",
-    legalName: "",
-    taxId: "",
-    phone: "",
-    email: "",
-    address: "",
-    currency: "EGP",
-    capacityM3Day: "1200",
-    alertEmail: "",
-    alertPhone: "",
-  });
-  const [savingPlant, setSavingPlant] = useState(false);
-
-  useEffect(() => {
-    if (!data) return;
-    setPlant({
-      plantName: data.plant.plantName,
-      legalName: data.plant.legalName ?? "",
-      taxId: data.plant.taxId ?? "",
-      phone: data.plant.phone ?? "",
-      email: data.plant.email ?? "",
-      address: data.plant.address ?? "",
-      currency: data.plant.currency,
-      capacityM3Day: String(data.plant.capacityM3Day),
-      alertEmail: data.plant.alertEmail ?? "",
-      alertPhone: data.plant.alertPhone ?? "",
-    });
-  }, [data]);
-
   const mixes = useMemo(() => data?.mixes ?? [], [data]);
 
   const activeMixCount = mixes.filter((mix) => mix.isActive).length;
-
-  const submitPlant = async () => {
-    setSavingPlant(true);
-    try {
-      await updatePlant({
-        plantName: plant.plantName.trim(),
-        legalName: plant.legalName.trim() || undefined,
-        taxId: plant.taxId.trim() || undefined,
-        phone: plant.phone.trim() || undefined,
-        email: plant.email.trim() || undefined,
-        address: plant.address.trim() || undefined,
-        currency: plant.currency.trim() || "EGP",
-        capacityM3Day: Number(plant.capacityM3Day) || 0,
-        alertEmail: plant.alertEmail.trim() || undefined,
-        alertPhone: plant.alertPhone.trim() || undefined,
-      });
-      toast.success("تم حفظ بيانات المحطة");
-    } catch (error) {
-      toast.error(readError(error, "تعذر حفظ بيانات المحطة"));
-    } finally {
-      setSavingPlant(false);
-    }
-  };
 
   const handleDeleteBranch = async (id: Id<"branches">, name: string) => {
     try {
@@ -783,134 +871,11 @@ export default function Settings() {
           </TabsContent>
 
           <TabsContent value="plant">
-            <Panel
-              title="بيانات المحطة"
-              description="تُستخدم في التقارير المطبوعة وفي تحديد مستلمي التنبيهات وطاقة المحطة اليومية."
-              action={
-                canManageSettings ? (
-                  <Button size="sm" onClick={submitPlant} disabled={savingPlant}>
-                    {savingPlant ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Save className="size-4" />
-                    )}
-                    حفظ البيانات
-                  </Button>
-                ) : undefined
-              }
-            >
-              {!canManageSettings ? (
-                <RoleNotice
-                  icon={Lock}
-                  title="عرض فقط"
-                  message="تعديل بيانات المحطة وأسعار الخلطات متاح للمالك والمدير."
-                />
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">اسم المحطة</Label>
-                    <Input
-                      value={plant.plantName}
-                      onChange={(event) =>
-                        setPlant((prev) => ({ ...prev, plantName: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">الاسم القانوني</Label>
-                    <Input
-                      value={plant.legalName}
-                      onChange={(event) =>
-                        setPlant((prev) => ({ ...prev, legalName: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">الرقم الضريبي</Label>
-                    <Input
-                      value={plant.taxId}
-                      onChange={(event) =>
-                        setPlant((prev) => ({ ...prev, taxId: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">الهاتف</Label>
-                    <Input
-                      value={plant.phone}
-                      onChange={(event) =>
-                        setPlant((prev) => ({ ...prev, phone: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">البريد الإلكتروني</Label>
-                    <Input
-                      value={plant.email}
-                      onChange={(event) =>
-                        setPlant((prev) => ({ ...prev, email: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">العنوان</Label>
-                    <Input
-                      value={plant.address}
-                      onChange={(event) =>
-                        setPlant((prev) => ({ ...prev, address: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">العملة</Label>
-                    <Input
-                      value={plant.currency}
-                      onChange={(event) =>
-                        setPlant((prev) => ({ ...prev, currency: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">الطاقة الإنتاجية (م³/يوم)</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      inputMode="numeric"
-                      value={plant.capacityM3Day}
-                      onChange={(event) =>
-                        setPlant((prev) => ({ ...prev, capacityM3Day: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">بريد مستلمي التنبيهات</Label>
-                    <Input
-                      value={plant.alertEmail}
-                      onChange={(event) =>
-                        setPlant((prev) => ({ ...prev, alertEmail: event.target.value }))
-                      }
-                      placeholder="owner@company.com"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">جوال التنبيهات</Label>
-                    <Input
-                      value={plant.alertPhone}
-                      onChange={(event) =>
-                        setPlant((prev) => ({ ...prev, alertPhone: event.target.value }))
-                      }
-                      placeholder="+201000000000"
-                    />
-                  </div>
-                  {data.plant.updatedAt && (
-                    <p className="text-[11px] text-muted-foreground sm:col-span-2">
-                      <Settings2 className="me-1 inline size-3" />
-                      آخر تحديث: {formatFullDate(new Date(data.plant.updatedAt).toISOString().slice(0, 10))}
-                    </p>
-                  )}
-                </div>
-              )}
-            </Panel>
+            <PlantPanel
+              key={data.plant.updatedAt ?? "plant"}
+              plant={data.plant}
+              canManage={canManageSettings}
+            />
           </TabsContent>
         </Tabs>
       )}

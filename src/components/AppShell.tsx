@@ -23,13 +23,18 @@ import { SYSTEM_MODULES } from "@/lib/modules";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
+  BellRing,
+  Boxes,
   CalendarDays,
   Factory,
+  FlaskConical,
   LayoutDashboard,
   LogOut,
   Menu,
   ScrollText,
+  Settings2,
   ShieldCheck,
+  TrendingUp,
   Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -59,6 +64,41 @@ const APP_NAV: NavItem[] = [
     hint: "إدخال ومراجعة بيانات اليوم",
     icon: Factory,
     audience: "فريق التشغيل",
+  },
+  {
+    to: "/quality",
+    label: "الجودة والاختبارات",
+    hint: "مكعبات الخرسانة واختبارات الركود",
+    icon: FlaskConical,
+    audience: "الجودة والمراجع",
+  },
+  {
+    to: "/inventory",
+    label: "المخازن والمواد",
+    hint: "أرصدة الأسمنت والركام وحركتها",
+    icon: Boxes,
+    audience: "المخازن والتشغيل",
+  },
+  {
+    to: "/forecast",
+    label: "التنبؤ والصيانة",
+    hint: "توقع الطلب وخطة الصيانة الوقائية",
+    icon: TrendingUp,
+    audience: "التخطيط والصيانة",
+  },
+  {
+    to: "/alerts",
+    label: "التنبيهات والحدود",
+    hint: "تنبيه تلقائي عند تجاوز أي حد",
+    icon: BellRing,
+    audience: "الإدارة والمالك",
+  },
+  {
+    to: "/settings",
+    label: "إعدادات المحطة",
+    hint: "الفروع وأسعار الخلطات المعتمدة",
+    icon: Settings2,
+    audience: "المالك والمدير",
   },
   {
     to: "/team",
@@ -138,6 +178,13 @@ function UserMenu() {
         >
           <Users className="size-4" />
           الفريق والصلاحيات
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => navigate("/settings")}
+          className="cursor-pointer"
+        >
+          <Settings2 className="size-4" />
+          إعدادات المحطة
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => navigate("/audit")}
@@ -240,10 +287,10 @@ function ModuleNav({ onNavigate }: { onNavigate?: () => void }) {
 function ScopeNote() {
   return (
     <div className="m-3 rounded-xl border border-sidebar-border bg-background/70 p-3">
-      <p className="text-[11px] font-semibold">الإصدار الأول</p>
+      <p className="text-[11px] font-semibold">التغطية الحالية</p>
       <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
-        يغطّي لوحة القيادة والإنتاج والكميات اليومية بدقة، والوحدات القادمة تُبنى
-        على نفس السجل دون إدخال مزدوج.
+        الفروع وأسعار الخلطات والجودة والمخازن والتنبيهات والتنبؤ تعمل فوق نفس سجل
+        الإنتاج، والوحدات القادمة تُبنى عليه دون إدخال مزدوج.
       </p>
     </div>
   );

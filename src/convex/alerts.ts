@@ -566,12 +566,13 @@ export const markEvents = internalMutation({
   },
 });
 
-/** Knock workflow that renders the email/SMS template. */
-const ALERT_WORKFLOW = "plant-threshold-alert";
+/** Knock workflow that renders the email/SMS template (overridable via env). */
+const DEFAULT_ALERT_WORKFLOW = "plant-threshold-alert";
 
 async function sendThroughKnock(event: PendingEvent, apiKey: string) {
   const base = process.env.KNOCK_API_BASE ?? "https://api.knock.app";
-  const response = await fetch(`${base}/v1/workflows/${ALERT_WORKFLOW}/trigger`, {
+  const workflow = process.env.KNOCK_ALERT_WORKFLOW ?? DEFAULT_ALERT_WORKFLOW;
+  const response = await fetch(`${base}/v1/workflows/${workflow}/trigger`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
