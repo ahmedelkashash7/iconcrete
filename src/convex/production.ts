@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { requireCapability, requireViewer } from "./access";
+import { diffRecords, recordAudit, snapshotRecord } from "./auditLog";
 import { mutation, query } from "./_generated/server";
 import { DATE_RE, MAX_ROWS, addDays, enrichLog, r2, utcToday } from "./measures";
 import { can, canEditLog } from "./permissions";
@@ -151,7 +152,7 @@ export const create = mutation({
     const viewer = await requireCapability(ctx, "createLog");
     const args = applyStandardPricing(viewer, fields);
     assertValid(args);
-    return await ctx.db.insert("productionLogs", {
+    const record = {
       ...args,
       customer: args.customer.trim(),
       mixDesign: args.mixDesign.trim(),
@@ -165,7 +166,17 @@ export const create = mutation({
       costPerM3: r2(args.costPerM3),
       isTestData: false,
       createdBy: viewer.userId,
+    };
+    const id = await ctx.db.insert("productionLogs", record);
+    await recordAudit(ctx, {
+      actorId: viewer.userId,
+      action: "create",
+      entity: "productionLogs",
+      entityId: id,
+      label: record.customer,
+      changes: snapshotRecord(record, "after"),
     });
+    return id;
   },
 });
 
@@ -185,7 +196,7 @@ export const update = mutation({
 
     const args = applyStandardPricing(viewer, fields);
     assertValid(args);
-    await ctx.db.patch(id, {
+    const next = {
       ...args,
       customer: args.customer.trim(),
       mixDesign: args.mixDesign.trim(),
@@ -197,6 +208,16 @@ export const update = mutation({
       returnedM3: r2(args.returnedM3),
       pricePerM3: r2(args.pricePerM3),
       costPerM3: r2(args.costPerM3),
+    };
+    await ctx.db.patch(id, next);
+    const changes = diffRecords(existing, { ...existing, ...next });
+    await recordAudit(ctx, {
+      actorId: viewer.userId,
+      action: "update",
+      entity: "productionLogs",
+      entityId: id,
+      label: next.customer,
+      changes,
     });
     return id;
   },
@@ -205,10 +226,18 @@ export const update = mutation({
 export const remove = mutation({
   args: { id: v.id("productionLogs") },
   handler: async (ctx, { id }) => {
-    await requireCapability(ctx, "deleteLog");
+    const viewer = await requireCapability(ctx, "deleteLog");
     const existing = await ctx.db.get(id);
     if (!existing) return null;
     await ctx.db.delete(id);
+    await recordAudit(ctx, {
+      actorId: viewer.userId,
+      action: "delete",
+      entity: "productionLogs",
+      entityId: id,
+      label: existing.customer,
+      changes: snapshotRecord(existing, "before"),
+    });
     return id;
   },
 });
@@ -217,7 +246,7 @@ export const remove = mutation({
 export const clearTestData = mutation({
   args: {},
   handler: async (ctx) => {
-    await requireCapability(ctx, "manageTestData");
+    const viewer = await requireCapability(ctx, "manageTestData");
     const rows = await ctx.db
       .query("productionLogs")
       .withIndex("by_date")
@@ -226,6 +255,13 @@ export const clearTestData = mutation({
     for (const row of testRows) {
       await ctx.db.delete(row._id);
     }
+    await recordAudit(ctx, {
+      actorId: viewer.userId,
+      action: "purge",
+      entity: "productionLogs",
+      label: `${testRows.length} قيد تجريبي`,
+      changes: [],
+    });
     return testRows.length;
   },
 });
@@ -278,7 +314,7 @@ function mulberry32(seed: number) {
 export const seedDemoData = mutation({
   args: { today: v.optional(v.string()) },
   handler: async (ctx, { today }) => {
-    await requireCapability(ctx, "manageTestData");
+    const viewer = await requireCapability(ctx, "manageTestData");
     const existing = await ctx.db.query("productionLogs").take(1);
     if (existing.length > 0) {
       return { inserted: 0, skipped: true };
@@ -358,6 +394,14 @@ export const seedDemoData = mutation({
     for (const row of rows) {
       await ctx.db.insert("productionLogs", row);
     }
+
+    await recordAudit(ctx, {
+      actorId: viewer.userId,
+      action: "seed",
+      entity: "productionLogs",
+      label: `${rows.length} قيد تجريبي`,
+      changes: [],
+    });
 
     return { inserted: rows.length, skipped: false };
   },

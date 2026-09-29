@@ -335,9 +335,10 @@ export const SYSTEM_MODULES: ModuleGroup[] = [
         id: "audit-trail",
         name: "سجل التتبع والتدقيق",
         purpose:
-          "من أنشأ أو عدّل أي قيد، ومتى، وبأي قيمة سابقة، ومن أي جهاز.",
+          "من أنشأ أو عدّل أو حذف أي قيد، ومتى، وبأي قيمة سابقة — أساس التوثيق في ISO 9001.",
         icon: ScrollText,
-        availability: "roadmap",
+        availability: "live",
+        route: "/audit",
       },
       {
         id: "backup",

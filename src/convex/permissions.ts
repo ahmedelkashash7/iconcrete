@@ -24,6 +24,7 @@ export type Capability =
   | "deleteLog"
   | "manageTestData"
   | "viewTeam"
+  | "viewAudit"
   | "manageRoles";
 
 export const CAPABILITIES: Capability[] = [
@@ -33,6 +34,7 @@ export const CAPABILITIES: Capability[] = [
   "deleteLog",
   "manageTestData",
   "viewTeam",
+  "viewAudit",
   "manageRoles",
 ];
 
@@ -47,9 +49,12 @@ export const ROLE_LABELS: Record<PlantRole, string> = {
 
 export const ROLE_DESCRIPTIONS: Record<PlantRole, string> = {
   owner: "المسؤول الأول عن النظام: كل الصلاحيات بما فيها إدارة أدوار الفريق.",
-  manager: "إدارة التشغيل والأرقام المالية والبيانات التجريبية، دون تغيير الأدوار.",
-  reviewer: "مراجعة وتصحيح القيود مع الاطلاع الكامل على الأرقام المالية.",
-  operator: "إدخال بيانات الوردية وتعديل قيود اليوم، دون عرض الأرقام المالية أو الحذف.",
+  manager:
+    "إدارة التشغيل والأرقام المالية والبيانات التجريبية، دون تغيير الأدوار.",
+  reviewer:
+    "مراجعة وتصحيح القيود، واطلاع كامل على الأرقام المالية وسجل التتبع.",
+  operator:
+    "إدخال بيانات الوردية وتعديل قيود يومه، دون عرض الأرقام المالية أو الحذف.",
 };
 
 export const CAPABILITY_LABELS: Record<Capability, string> = {
@@ -59,6 +64,7 @@ export const CAPABILITY_LABELS: Record<Capability, string> = {
   deleteLog: "حذف قيد إنتاج",
   manageTestData: "تحميل أو حذف البيانات التجريبية",
   viewTeam: "عرض الفريق وأدواره",
+  viewAudit: "عرض سجل التتبع لكل عملية (من عدّل ماذا وبأي قيمة سابقة)",
   manageRoles: "تغيير أدوار الفريق",
 };
 
@@ -71,17 +77,23 @@ export const ROLE_CAPABILITIES: Record<PlantRole, Capability[]> = {
     "deleteLog",
     "manageTestData",
     "viewTeam",
+    "viewAudit",
   ],
-  reviewer: ["viewFinancials", "editLog"],
+  reviewer: ["viewFinancials", "editLog", "viewAudit"],
   operator: ["createLog", "editLog"],
 };
 
-/** Capabilities granted to an anonymous sandbox visitor. */
+/**
+ * Capabilities granted to an anonymous sandbox visitor: they may look at
+ * everything and try data entry, but never delete records, change roles or
+ * manage the plant's people.
+ */
 export const GUEST_CAPABILITIES: Capability[] = [
   "viewFinancials",
   "createLog",
   "editLog",
   "manageTestData",
+  "viewAudit",
 ];
 
 export type Viewer = {

@@ -1,5 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError } from "convex/values";
+import { recordAudit } from "./auditLog";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
@@ -129,7 +130,16 @@ export const setRole = mutation({
       }
     }
 
+    const previousRole = normalizeRole(target.role);
     await ctx.db.patch(userId, { role });
+    await recordAudit(ctx, {
+      actorId: viewer.userId,
+      action: "role_change",
+      entity: "users",
+      entityId: userId,
+      label: target.name?.trim() || target.email || "عضو الفريق",
+      changes: [{ field: "role", before: previousRole ?? "", after: role }],
+    });
     return role;
   },
 });

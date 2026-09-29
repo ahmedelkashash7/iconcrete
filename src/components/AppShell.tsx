@@ -28,6 +28,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  ScrollText,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -65,6 +66,13 @@ const APP_NAV: NavItem[] = [
     hint: "من يرى ماذا ومن يعدّل ماذا",
     icon: ShieldCheck,
     audience: "المالك والمدير",
+  },
+  {
+    to: "/audit",
+    label: "سجل التتبع",
+    hint: "كل عملية بالقيم قبل وبعد",
+    icon: ScrollText,
+    audience: "المالك والمراجع",
   },
 ];
 
@@ -130,6 +138,13 @@ function UserMenu() {
         >
           <Users className="size-4" />
           الفريق والصلاحيات
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => navigate("/audit")}
+          className="cursor-pointer"
+        >
+          <ScrollText className="size-4" />
+          سجل التتبع
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem

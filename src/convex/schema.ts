@@ -35,6 +35,24 @@ export const shiftValidator = v.union(
 );
 export type Shift = Infer<typeof shiftValidator>;
 
+/** Every audited operation type (see ./auditLog for the writer). */
+export const auditActionValidator = v.union(
+  v.literal("create"),
+  v.literal("update"),
+  v.literal("delete"),
+  v.literal("seed"),
+  v.literal("purge"),
+  v.literal("role_change"),
+);
+export type AuditAction = Infer<typeof auditActionValidator>;
+
+/** One field-level entry inside an audit record («الحقل: قبل ← بعد»). */
+export const auditChangeValidator = v.object({
+  field: v.string(),
+  before: v.optional(v.string()),
+  after: v.optional(v.string()),
+});
+
 /** Lifecycle of a single production/dispatch record. */
 export const logStatusValidator = v.union(
   v.literal("delivered"),
@@ -64,6 +82,28 @@ const schema = defineSchema(
      * One row = one dispatch order produced by the plant on a given day/shift.
      * Quantities are cubic meters (m³), money values are EGP.
      */
+    /**
+     * Audit trail — who did what, when, on which record, and the previous and
+     * new values of every changed field. Written by every mutating function.
+     */
+    auditLogs: defineTable({
+      actorId: v.optional(v.id("users")),
+      actorName: v.string(),
+      actorEmail: v.optional(v.string()),
+      actorRole: v.optional(v.string()),
+      isAnonymous: v.boolean(),
+      action: auditActionValidator,
+      entity: v.string(),
+      entityId: v.optional(v.string()),
+      /** Human label of the touched record (customer, member, batch count…). */
+      label: v.optional(v.string()),
+      changes: v.array(auditChangeValidator),
+      at: v.number(),
+      date: v.string(),
+    })
+      .index("by_at", ["at"])
+      .index("by_date", ["date"]),
+
     productionLogs: defineTable({
       /** ISO day the work happened (YYYY-MM-DD) — the Power Query "sort by date" key. */
       date: v.string(),

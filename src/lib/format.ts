@@ -103,6 +103,16 @@ export function formatFullDate(iso: string): string {
   return fullDate.format(new Date(`${iso}T00:00:00Z`));
 }
 
+const timeOfDay = new Intl.DateTimeFormat(LOCALE, {
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+/** Clock time of an epoch timestamp — used by the audit trail. */
+export function formatTime(epochMs: number): string {
+  return timeOfDay.format(new Date(epochMs));
+}
+
 /* ------------------------------ date math ---------------------------- */
 
 const DAY_MS = 86_400_000;
