@@ -46,13 +46,13 @@
 :root {
   --radius: 0.75rem;
   /* quiet neutrals: near-white canvas, crisp white surfaces, graphite ink */
-  --background: oklch(0.983 0.003 250);
+  --background: oklch(0.978 0.003 252);
   --foreground: oklch(0.215 0.016 256);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.215 0.016 256);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.215 0.016 256);
-  --primary: oklch(0.315 0.033 256);
+  --primary: oklch(0.3 0.036 256);
   --primary-foreground: oklch(0.985 0.002 250);
   --secondary: oklch(0.964 0.004 250);
   --secondary-foreground: oklch(0.315 0.02 256);
@@ -61,7 +61,7 @@
   --accent: oklch(0.958 0.006 250);
   --accent-foreground: oklch(0.28 0.02 256);
   --destructive: oklch(0.577 0.188 25);
-  --border: oklch(0.917 0.005 256);
+  --border: oklch(0.912 0.006 256);
   --input: oklch(0.9 0.006 256);
   --ring: oklch(0.62 0.04 256);
   /* data colours: revenue / production / cost / loss / margin */
@@ -70,7 +70,7 @@
   --chart-3: oklch(0.716 0.14 66);
   --chart-4: oklch(0.596 0.168 22);
   --chart-5: oklch(0.573 0.112 300);
-  --sidebar: oklch(0.995 0.002 250);
+  --sidebar: oklch(0.993 0.002 250);
   --sidebar-foreground: oklch(0.215 0.016 256);
   --sidebar-primary: oklch(0.315 0.033 256);
   --sidebar-primary-foreground: oklch(0.985 0.002 250);
@@ -157,7 +157,7 @@
   h1,
   h2,
   h3 {
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
   }
 }
 
@@ -166,7 +166,8 @@
   .soft-card {
     box-shadow:
       0 1px 2px rgb(16 24 40 / 4%),
-      0 12px 32px -18px rgb(16 24 40 / 18%);
+      0 12px 32px -18px rgb(16 24 40 / 18%),
+      inset 0 1px 0 rgb(255 255 255 / 60%);
   }
   .soft-card-hover {
     transition:

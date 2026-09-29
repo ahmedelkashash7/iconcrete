@@ -115,8 +115,12 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
       <div className="bp-grid pointer-events-none absolute inset-0 opacity-60 [mask-image:radial-gradient(ellipse_at_50%_0%,black,transparent_70%)]" />
 
       <header className="relative mx-auto flex h-16 w-full max-w-6xl items-center px-4 sm:px-6">
-        <button type="button" onClick={() => navigate("/")} aria-label="الصفحة الرئيسية">
-          <BrandLockup />
+        <button
+          type="button"
+          onClick={() => navigate("/")}
+          aria-label="الصفحة الرئيسية"
+        >
+          <BrandLockup subtitle={null} />
         </button>
       </header>
 
@@ -129,11 +133,11 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                   <BrandMark className="size-14" />
                 </div>
                 <CardTitle className="mt-2 text-xl">
-                  الدخول إلى IConcrete
+                  الدخول إلى IConcrete System
                 </CardTitle>
                 <CardDescription>
-                  أدخل بريد العمل لإرسال كود التحقق وتسجيل الدخول إلى لوحة
-                  المحطة.
+                  أدخل بريد العمل لإنشاء حسابك أو الدخول إلى حسابك — يصل كود
+                  التحقق إلى بريدك خلال لحظات.
                 </CardDescription>
               </CardHeader>
               <form onSubmit={handleEmailSubmit}>
@@ -188,7 +192,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       disabled={isLoading}
                     >
                       <UserX className="size-4" />
-                      الدخول كزائر (عرض سريع)
+                      الدخول كزائر (استعراض سريع للمنظومة)
                     </Button>
                   </div>
                 </CardContent>

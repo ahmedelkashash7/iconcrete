@@ -29,18 +29,24 @@ export function BrandMark({ className }: { className?: string }) {
 export function BrandLockup({
   className,
   markClassName,
+  subtitle = "نظام متكامل لإدارة محطات الخرسانة الجاهزة",
 }: {
   className?: string;
   markClassName?: string;
+  subtitle?: string | null;
 }) {
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
       <BrandMark className={markClassName} />
-      <div className="leading-tight">
-        <p className="text-sm font-semibold tracking-tight">IConcrete</p>
-        <p className="text-[11px] text-muted-foreground">
-          إدارة محطات الخرسانة الجاهزة
+      <div className="min-w-0 leading-tight">
+        <p className="truncate text-sm font-semibold tracking-tight">
+          IConcrete <span className="text-brand">System</span>
         </p>
+        {subtitle && (
+          <p className="truncate text-[11px] text-muted-foreground">
+            {subtitle}
+          </p>
+        )}
       </div>
     </div>
   );

@@ -18,8 +18,17 @@ import {
 } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/use-auth";
 import { formatFullDate, todayISO } from "@/lib/format";
+import { SYSTEM_MODULES } from "@/lib/modules";
 import { cn } from "@/lib/utils";
-import { CalendarDays, Factory, LayoutDashboard, LogOut, Menu } from "lucide-react";
+import {
+  ArrowLeft,
+  CalendarDays,
+  Factory,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  ShieldCheck,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
@@ -30,6 +39,7 @@ type NavItem = {
   label: string;
   hint: string;
   icon: LucideIcon;
+  audience: string;
 };
 
 const APP_NAV: NavItem[] = [
@@ -38,12 +48,14 @@ const APP_NAV: NavItem[] = [
     label: "لوحة القيادة",
     hint: "الأرباح والخسائر ومؤشرات التشغيل",
     icon: LayoutDashboard,
+    audience: "الإدارة والمالك",
   },
   {
     to: "/production",
-    label: "الإنتاج اليومي",
-    hint: "قيود الإنتاج والكميات لكل وردية",
+    label: "الإنتاج والكميات",
+    hint: "إدخال ومراجعة بيانات اليوم",
     icon: Factory,
+    audience: "فريق التشغيل",
   },
 ];
 
@@ -90,12 +102,17 @@ function UserMenu() {
           </span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="end" className="w-60">
         <DropdownMenuLabel className="font-normal">
           <span className="block truncate text-sm font-medium">{displayName}</span>
           <span className="block truncate text-xs text-muted-foreground">
             {user?.email ?? "حساب زائر"}
           </span>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="flex items-center gap-1.5 text-[11px] font-normal text-muted-foreground">
+          <ShieldCheck className="size-3.5" />
+          الوصول موثّق لكل قيد مسجّل في النظام
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem
@@ -128,8 +145,13 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
           }
         >
           <item.icon className="mt-0.5 size-4 shrink-0" />
-          <span className="min-w-0">
-            <span className="block text-sm font-medium">{item.label}</span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-baseline justify-between gap-2">
+              <span className="block text-sm font-medium">{item.label}</span>
+              <span className="shrink-0 text-[10px] text-muted-foreground">
+                {item.audience}
+              </span>
+            </span>
             <span className="mt-0.5 block text-[11px] leading-4 text-muted-foreground">
               {item.hint}
             </span>
@@ -140,24 +162,70 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+/** Compact department map: shows the whole system scope from the sidebar. */
+function ModuleNav({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <div className="mt-1 flex flex-col gap-0.5">
+      {SYSTEM_MODULES.map((group) => {
+        const liveCount = group.modules.filter(
+          (module) => module.availability === "live",
+        ).length;
+        return (
+          <NavLink
+            key={group.id}
+            to="/system"
+            onClick={onNavigate}
+            title={group.summary}
+            className="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
+          >
+            <group.icon className="size-3.5 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">{group.name}</span>
+            <span
+              className={cn(
+                "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                liveCount > 0
+                  ? "bg-success/15 text-success"
+                  : "bg-muted text-muted-foreground",
+              )}
+            >
+              {liveCount > 0 ? `${liveCount} متاح` : "قريبًا"}
+            </span>
+          </NavLink>
+        );
+      })}
+      <NavLink
+        to="/system"
+        onClick={onNavigate}
+        className="mt-1 flex items-center justify-between gap-2 rounded-lg border border-dashed border-sidebar-border px-3 py-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
+      >
+        خريطة النظام الكاملة
+        <ArrowLeft className="size-3.5" />
+      </NavLink>
+    </div>
+  );
+}
+
 function ScopeNote() {
   return (
     <div className="m-3 rounded-xl border border-sidebar-border bg-background/70 p-3">
       <p className="text-[11px] font-semibold">الإصدار الأول</p>
       <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
-        لوحة الإنتاج والكميات اليومية مع مؤشرات الأرباح والخسائر. طبقات IoT،
-        تعدد الفروع والتكاملات المحاسبية تأتي في الإصدارات التالية.
+        يغطّي لوحة القيادة والإنتاج والكميات اليومية بدقة، والوحدات القادمة تُبنى
+        على نفس السجل دون إدخال مزدوج.
       </p>
     </div>
   );
 }
 
 export function AppShell({
+  eyebrow,
   title,
   description,
   actions,
   children,
 }: {
+  /** Small label above the page title, e.g. «إدخال ومراجعة البيانات». */
+  eyebrow?: string;
   title: string;
   description?: string;
   actions?: ReactNode;
@@ -170,13 +238,19 @@ export function AppShell({
       {/* Desktop sidebar (start side = right in RTL) */}
       <aside className="fixed inset-y-0 start-0 z-40 hidden w-64 flex-col border-e border-sidebar-border bg-sidebar lg:flex">
         <div className="flex h-16 items-center border-b border-sidebar-border px-4">
-          <BrandLockup />
+          <NavLink to="/dashboard">
+            <BrandLockup subtitle="نظام متكامل لمحطات الخرسانة الجاهزة" />
+          </NavLink>
         </div>
         <div className="flex-1 overflow-y-auto p-3">
           <p className="px-3 pb-2 text-[11px] font-medium text-muted-foreground">
-            التشغيل
+            التشغيل اليومي
           </p>
           <NavLinks />
+          <p className="mt-5 px-3 pb-2 text-[11px] font-medium text-muted-foreground">
+            منظومة الوحدات
+          </p>
+          <ModuleNav />
         </div>
         <ScopeNote />
       </aside>
@@ -194,15 +268,21 @@ export function AppShell({
                 <Menu className="size-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[19rem] p-0">
+            <SheetContent side="right" className="w-[19rem] overflow-y-auto p-0">
               <SheetHeader className="border-b border-border/70 px-4 py-4 text-start">
-                <SheetTitle className="flex items-center gap-2 text-sm">
-                  <BrandMark className="size-8" />
-                  IConcrete
+                <SheetTitle>
+                  <BrandLockup
+                    markClassName="size-8"
+                    subtitle="نظام متكامل لمحطات الخرسانة الجاهزة"
+                  />
                 </SheetTitle>
               </SheetHeader>
               <div className="p-3">
                 <NavLinks onNavigate={() => setMenuOpen(false)} />
+                <p className="mt-5 px-3 pb-2 text-[11px] font-medium text-muted-foreground">
+                  منظومة الوحدات
+                </p>
+                <ModuleNav onNavigate={() => setMenuOpen(false)} />
               </div>
               <ScopeNote />
             </SheetContent>
@@ -210,7 +290,9 @@ export function AppShell({
 
           <NavLink to="/dashboard" className="flex items-center gap-2 lg:hidden">
             <BrandMark className="size-7" />
-            <span className="text-sm font-semibold">IConcrete</span>
+            <span className="text-sm font-semibold">
+              IConcrete <span className="text-brand">System</span>
+            </span>
           </NavLink>
 
           <div className="flex-1" />
@@ -225,6 +307,11 @@ export function AppShell({
         <main className="mx-auto w-full max-w-[1440px] px-4 pb-20 pt-6 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="min-w-0">
+              {eyebrow && (
+                <p className="mb-2 text-[11px] font-semibold tracking-wide text-brand">
+                  {eyebrow}
+                </p>
+              )}
               <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
                 {title}
               </h1>

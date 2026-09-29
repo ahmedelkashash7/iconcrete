@@ -275,8 +275,9 @@ export default function Dashboard() {
   if (!data) {
     return (
       <AppShell
+        eyebrow="نظرة الإدارة والمالك"
         title="لوحة القيادة"
-        description="مؤشرات الأرباح والخسائر وأداء محطة الخرسانة الجاهزة."
+        description="ملخص تنفيذي لأرباح المحطة وخسائرها وأداء التشغيل."
         actions={actions}
       >
         <DashboardSkeleton />
@@ -289,12 +290,13 @@ export default function Dashboard() {
 
   return (
     <AppShell
+      eyebrow="نظرة الإدارة والمالك"
       title="لوحة القيادة"
-      description={`الأرباح والخسائر وأداء المحطة خلال آخر ${formatNumber(
+      description={`أرباح المحطة وخسائرها وكمياتها خلال آخر ${formatNumber(
         data.range.days,
-      )} يومًا — الفترة من ${formatDay(data.range.start)} إلى ${formatDay(
+      )} يومًا (${formatDay(data.range.start)} — ${formatDay(
         data.range.end,
-      )}.`}
+      )})، محسوبة مباشرة من قيود الإنتاج.`}
       actions={actions}
     >
       {data.testDataCount > 0 && (
@@ -302,7 +304,7 @@ export default function Dashboard() {
           <p className="flex items-center gap-2 text-xs text-foreground">
             <AlertTriangle className="size-4 text-warning-foreground" />
             يوجد {formatNumber(data.testDataCount)} قيدًا موسومًا كبيانات تجريبية
-            (Test Data) ولا يمثل تشغيلًا حقيقيًا.
+            (Test Data) للاستعراض فقط، ولا يمثل تشغيلًا فعليًا للمحطة.
           </p>
           <Button
             variant="outline"
@@ -324,12 +326,12 @@ export default function Dashboard() {
               <Layers className="size-5" />
             </div>
             <h2 className="mt-4 text-lg font-semibold">
-              لا توجد قيود إنتاج حتى الآن
+              لا توجد قيود إنتاج مسجّلة بعد
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              سجّل أول طلبية من شاشة الإنتاج اليومي لتظهر هنا مؤشرات الأرباح
-              والخسائر والكميات. ويمكنك تحميل بيانات تجريبية لاستعراض اللوحة
-              فورًا.
+              سجّل أول طلبية من شاشة الإنتاج والكميات، وستظهر هنا مؤشرات الأرباح
+              والخسائر والهوامش وأداء الورديات. أو حمّل بيانات تجريبية لاستعراض
+              المنظومة كاملة قبل التشغيل الفعلي.
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
               <Button onClick={() => navigate("/production?new=1")}>

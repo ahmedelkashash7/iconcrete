@@ -1,7 +1,7 @@
 {
-  "name": "IConcrete — إدارة محطات الخرسانة الجاهزة",
-  "short_name": "IConcrete",
-  "description": "لوحة الإنتاج والكميات اليومية ومؤشرات الأرباح والخسائر لمحطات الخرسانة الجاهزة",
+  "name": "IConcrete System — نظام إدارة محطات الخرسانة الجاهزة",
+  "short_name": "IConcrete System",
+  "description": "نظام متكامل لمحطات الخرسانة الجاهزة: الإنتاج والكميات اليومية، الأرباح والخسائر، التشغيل والمخازن والجودة والأسطول والصيانة.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f7f8fa",
