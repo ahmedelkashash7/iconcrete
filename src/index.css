@@ -201,4 +201,20 @@
   .no-scrollbar {
     scrollbar-width: none;
   }
+  /* chart polish: softer grid, readable ticks, crisp rounded bars */
+  .recharts-cartesian-grid line {
+    stroke: var(--border);
+    opacity: 0.6;
+  }
+  .recharts-cartesian-axis-tick text {
+    font-size: 11px;
+    fill: var(--muted-foreground);
+  }
+  .recharts-bar-rectangle path,
+  .recharts-line-curve {
+    transition: opacity 160ms ease;
+  }
+  .recharts-surface:focus {
+    outline: none;
+  }
 }

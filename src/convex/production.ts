@@ -358,6 +358,36 @@ const SITES = [
 const SHIFTS: Shift[] = ["morning", "evening", "night"];
 
 /**
+ * Lightweight status used by the client to fill the demo estate exactly once,
+ * so every screen has something to show on a fresh deployment.
+ */
+export const demoStatus = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireViewer(ctx);
+    const [logs, quality, materials, equipment, branches] = await Promise.all([
+      ctx.db.query("productionLogs").take(1),
+      ctx.db.query("qualityTests").take(1),
+      ctx.db.query("materials").take(1),
+      ctx.db.query("equipment").take(1),
+      ctx.db.query("branches").take(1),
+    ]);
+    return {
+      hasLogs: logs.length > 0,
+      hasQuality: quality.length > 0,
+      hasMaterials: materials.length > 0,
+      hasEquipment: equipment.length > 0,
+      hasBranches: branches.length > 0,
+      isEmpty:
+        logs.length === 0 &&
+        quality.length === 0 &&
+        materials.length === 0 &&
+        equipment.length === 0,
+    };
+  },
+});
+
+/**
  * Seeds the demo estate one layer at a time, so the button also repairs a
  * deployment that already holds an older demo ledger: the ledger is only
  * generated when the plant is empty, and the quality samples, stores, fleet and

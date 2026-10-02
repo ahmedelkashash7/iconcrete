@@ -1,4 +1,5 @@
 import { BrandLockup, BrandMark } from "@/components/BrandMark";
+import { LanguageToggle } from "@/components/LanguageToggle";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,7 +17,8 @@ import {
 } from "@/components/ui/input-otp";
 
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowLeft, Loader2, Mail, UserX } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
+import { ArrowLeft, ArrowRight, Loader2, Mail, UserX } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
@@ -36,6 +38,8 @@ function resolveRedirectAfterAuth(
 
 function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const { isLoading: authLoading, isAuthenticated, signIn } = useAuth();
+  const { pick, isRTL } = useI18n();
+  const Arrow = isRTL ? ArrowLeft : ArrowRight;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirect = resolveRedirectAfterAuth(
@@ -67,7 +71,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
       setError(
         error instanceof Error
           ? error.message
-          : "تعذر إرسال كود التحقق. حاول مرة أخرى.",
+          : pick("تعذر إرسال كود التحقق. حاول مرة أخرى.", "Could not send the code. Try again."),
       );
       setIsLoading(false);
     }
@@ -87,7 +91,12 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     } catch (error) {
       console.error("OTP verification error:", error);
 
-      setError("كود التحقق غير صحيح، تأكد من الأرقام الستة في البريد.");
+      setError(
+        pick(
+          "كود التحقق غير صحيح، تأكد من الأرقام الستة في البريد.",
+          "Incorrect code — check the six digits in your email.",
+        ),
+      );
 
       setIsLoading(false);
 
@@ -104,7 +113,10 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     } catch (error) {
       console.error("Guest login error:", error);
       setError(
-        `تعذر الدخول كزائر: ${error instanceof Error ? error.message : "خطأ غير معروف"}`,
+        pick(
+          `تعذر الدخول كزائر: ${error instanceof Error ? error.message : "خطأ غير معروف"}`,
+          `Guest sign-in failed: ${error instanceof Error ? error.message : "unknown error"}`,
+        ),
       );
       setIsLoading(false);
     }
@@ -114,14 +126,17 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     <div className="relative flex min-h-screen flex-col bg-background">
       <div className="bp-grid pointer-events-none absolute inset-0 opacity-60 [mask-image:radial-gradient(ellipse_at_50%_0%,black,transparent_70%)]" />
 
-      <header className="relative mx-auto flex h-16 w-full max-w-6xl items-center px-4 sm:px-6">
+      <header className="relative mx-auto flex h-16 w-full max-w-6xl items-center gap-3 px-4 sm:px-6">
         <button
           type="button"
           onClick={() => navigate("/")}
-          aria-label="الصفحة الرئيسية"
+          aria-label={pick("الصفحة الرئيسية", "Home")}
         >
           <BrandLockup subtitle={null} />
         </button>
+        <div className="ms-auto">
+          <LanguageToggle />
+        </div>
       </header>
 
       <div className="relative flex flex-1 items-center justify-center px-4 pb-16">
@@ -133,11 +148,13 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                   <BrandMark className="size-14" />
                 </div>
                 <CardTitle className="mt-2 text-xl">
-                  الدخول إلى IConcrete System
+                  {pick("الدخول إلى IConcrete System", "Sign in to IConcrete System")}
                 </CardTitle>
                 <CardDescription>
-                  أدخل بريد العمل لإنشاء حسابك أو الدخول إلى حسابك — يصل كود
-                  التحقق إلى بريدك خلال لحظات.
+                  {pick(
+                    "أدخل بريد العمل لإنشاء حسابك أو الدخول إلى حسابك — يصل كود التحقق إلى بريدك خلال لحظات.",
+                    "Enter your work email to sign in or create an account — the code arrives in moments.",
+                  )}
                 </CardDescription>
               </CardHeader>
               <form onSubmit={handleEmailSubmit}>
@@ -158,13 +175,13 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       type="submit"
                       variant="outline"
                       size="icon"
-                      aria-label="إرسال كود التحقق"
+                      aria-label={pick("إرسال كود التحقق", "Send verification code")}
                       disabled={isLoading}
                     >
                       {isLoading ? (
                         <Loader2 className="size-4 animate-spin" />
                       ) : (
-                        <ArrowLeft className="size-4" />
+                        <Arrow className="size-4" />
                       )}
                     </Button>
                   </div>
@@ -179,7 +196,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       </div>
                       <div className="relative flex justify-center text-xs">
                         <span className="bg-card px-2 text-muted-foreground">
-                          أو
+                          {pick("أو", "or")}
                         </span>
                       </div>
                     </div>
@@ -192,13 +209,17 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       disabled={isLoading}
                     >
                       <UserX className="size-4" />
-                      الدخول كزائر (استعراض سريع للمنظومة)
+                      {pick(
+                        "الدخول كزائر (استعراض سريع للمنظومة)",
+                        "Continue as guest (quick tour)",
+                      )}
                     </Button>
 
                     <p className="mt-3 text-center text-[11px] leading-5 text-muted-foreground">
-                      الزائر يستعرض المؤشرات ويجرّب الإدخال، دون حذف بيانات أو
-                      إدارة أدوار. وأول حساب يُسجَّل بالبريد يصبح «مالك» النظام
-                      ويوزّع الصلاحيات على الفريق من شاشة الفريق والصلاحيات.
+                      {pick(
+                        "الزائر يستعرض المؤشرات ويجرّب الإدخال، دون حذف بيانات أو إدارة أدوار. وأول حساب يُسجَّل بالبريد يصبح «مالك» النظام ويوزّع الصلاحيات على الفريق من شاشة الفريق والصلاحيات.",
+                        "Guests explore the KPIs and try data entry, but cannot delete data or manage roles. The first email account becomes the system owner and can grant team access.",
+                      )}
                     </p>
                   </div>
                 </CardContent>
@@ -210,9 +231,14 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                 <div className="flex justify-center">
                   <BrandMark className="size-12" />
                 </div>
-                <CardTitle className="mt-2 text-xl">راجع بريدك</CardTitle>
+                <CardTitle className="mt-2 text-xl">
+                  {pick("راجع بريدك", "Check your email")}
+                </CardTitle>
                 <CardDescription>
-                  أرسلنا كودًا مكوّنًا من ٦ أرقام إلى {step.email}
+                  {pick(
+                    `أرسلنا كودًا مكوّنًا من ٦ أرقام إلى ${step.email}`,
+                    `We sent a 6-digit code to ${step.email}`,
+                  )}
                 </CardDescription>
               </CardHeader>
               <form onSubmit={handleOtpSubmit}>
@@ -248,14 +274,14 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     </p>
                   )}
                   <p className="mt-4 text-center text-sm text-muted-foreground">
-                    لم يصلك الكود؟{" "}
+                    {pick("لم يصلك الكود؟", "Didn't get the code?")}{" "}
                     <Button
                       variant="link"
                       type="button"
                       className="h-auto p-0"
                       onClick={() => setStep("signIn")}
                     >
-                      إعادة المحاولة
+                      {pick("إعادة المحاولة", "Try again")}
                     </Button>
                   </p>
                 </CardContent>
@@ -268,12 +294,12 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     {isLoading ? (
                       <>
                         <Loader2 className="size-4 animate-spin" />
-                        جارٍ التحقق...
+                        {pick("جارٍ التحقق...", "Verifying…")}
                       </>
                     ) : (
                       <>
-                        تأكيد الكود
-                        <ArrowLeft className="size-4" />
+                        {pick("تأكيد الكود", "Confirm code")}
+                        <Arrow className="size-4" />
                       </>
                     )}
                   </Button>
@@ -284,7 +310,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     disabled={isLoading}
                     className="w-full"
                   >
-                    استخدام بريد آخر
+                    {pick("استخدام بريد آخر", "Use another email")}
                   </Button>
                 </CardFooter>
               </form>
@@ -292,7 +318,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
           )}
 
           <div className="border-t bg-muted px-6 py-4 text-center text-xs text-muted-foreground">
-            مؤمَّن عبر{" "}
+            {pick("مؤمَّن عبر", "Secured by")}{" "}
             <a
               href="https://freebuff.com"
               target="_blank"

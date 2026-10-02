@@ -53,6 +53,7 @@ import {
   Banknote,
   ClipboardList,
   Download,
+  FileUp,
   Gauge,
   Layers,
   Loader2,
@@ -282,6 +283,12 @@ export default function Dashboard() {
   const actions = (
     <>
       {rangeToggle}
+      <Button variant="outline" asChild>
+        <Link to="/import">
+          <FileUp className="size-4" />
+          استيراد Excel
+        </Link>
+      </Button>
       <Button variant="outline" onClick={handleExport} disabled={!data?.hasData}>
         <Download className="size-4" />
         تصدير CSV
@@ -378,18 +385,28 @@ export default function Dashboard() {
               />
             }
           />
+          <defs>
+            <linearGradient id="icRevenue" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-revenue)" stopOpacity={0.95} />
+              <stop offset="100%" stopColor="var(--color-revenue)" stopOpacity={0.45} />
+            </linearGradient>
+            <linearGradient id="icCost" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-cost)" stopOpacity={0.9} />
+              <stop offset="100%" stopColor="var(--color-cost)" stopOpacity={0.4} />
+            </linearGradient>
+          </defs>
           <ChartLegend content={<ChartLegendContent />} />
           <ReferenceLine y={0} stroke="var(--border)" />
           <Bar
             dataKey="revenue"
-            fill="var(--color-revenue)"
-            radius={[4, 4, 0, 0]}
+            fill="url(#icRevenue)"
+            radius={[6, 6, 0, 0]}
             maxBarSize={18}
           />
           <Bar
             dataKey="cost"
-            fill="var(--color-cost)"
-            radius={[4, 4, 0, 0]}
+            fill="url(#icCost)"
+            radius={[6, 6, 0, 0]}
             maxBarSize={18}
           />
           <Line
@@ -438,17 +455,27 @@ export default function Dashboard() {
               />
             }
           />
+          <defs>
+            <linearGradient id="icProduced" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-productionM3)" stopOpacity={0.95} />
+              <stop offset="100%" stopColor="var(--color-productionM3)" stopOpacity={0.4} />
+            </linearGradient>
+            <linearGradient id="icDelivered" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-deliveredM3)" stopOpacity={0.95} />
+              <stop offset="100%" stopColor="var(--color-deliveredM3)" stopOpacity={0.4} />
+            </linearGradient>
+          </defs>
           <ChartLegend content={<ChartLegendContent />} />
           <Bar
             dataKey="productionM3"
-            fill="var(--color-productionM3)"
-            radius={[4, 4, 0, 0]}
+            fill="url(#icProduced)"
+            radius={[6, 6, 0, 0]}
             maxBarSize={16}
           />
           <Bar
             dataKey="deliveredM3"
-            fill="var(--color-deliveredM3)"
-            radius={[4, 4, 0, 0]}
+            fill="url(#icDelivered)"
+            radius={[6, 6, 0, 0]}
             maxBarSize={16}
           />
         </BarChart>
@@ -594,13 +621,13 @@ export default function Dashboard() {
                 <Bar
                   dataKey="revenue"
                   fill="var(--color-revenue)"
-                  radius={[0, 4, 4, 0]}
+                  radius={[0, 6, 6, 0]}
                   maxBarSize={12}
                 />
                 <Bar
                   dataKey="profit"
                   fill="var(--color-profit)"
-                  radius={[0, 4, 4, 0]}
+                  radius={[0, 6, 6, 0]}
                   maxBarSize={12}
                 />
               </>
@@ -608,7 +635,7 @@ export default function Dashboard() {
               <Bar
                 dataKey="m3"
                 fill="var(--color-m3)"
-                radius={[0, 4, 4, 0]}
+                radius={[0, 6, 6, 0]}
                 maxBarSize={14}
               />
             )}

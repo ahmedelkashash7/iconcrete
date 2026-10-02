@@ -1,6 +1,7 @@
 import '@vly-ai/integrations';
 import { Toaster } from "@/components/ui/sonner";
 import { RequireAuth } from "@/components/RequireAuth";
+import { LanguageProvider } from "@/lib/i18n";
 import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient } from "convex/react";
@@ -23,6 +24,7 @@ const Forecast = lazy(() => import("./pages/Forecast.tsx"));
 const Alerts = lazy(() => import("./pages/Alerts.tsx"));
 const Settings = lazy(() => import("./pages/Settings.tsx"));
 const ExcelPack = lazy(() => import("./pages/ExcelPack.tsx"));
+const DataImport = lazy(() => import("./pages/DataImport.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 // Simple loading fallback for route transitions
@@ -125,6 +127,7 @@ createRoot(document.getElementById("root")!).render(
         <VlyToolbar />
       </ToolbarErrorBoundary>
       <ConvexAuthProvider client={convex}>
+        <LanguageProvider>
         <BrowserRouter>
           <RouteSyncer />
           <Suspense fallback={<RouteLoading />}>
@@ -215,6 +218,14 @@ createRoot(document.getElementById("root")!).render(
                 }
               />
               <Route
+                path="/import"
+                element={
+                  <RequireAuth>
+                    <DataImport />
+                  </RequireAuth>
+                }
+              />
+              <Route
                 path="/excel-pack"
                 element={
                   <RequireAuth>
@@ -227,6 +238,7 @@ createRoot(document.getElementById("root")!).render(
           </Suspense>
         </BrowserRouter>
         <Toaster />
+        </LanguageProvider>
       </ConvexAuthProvider>
     </RootErrorBoundary>
   </StrictMode>,
