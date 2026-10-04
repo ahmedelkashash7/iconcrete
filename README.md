@@ -1,293 +1,187 @@
-## Overview
+# IConcrete System
 
-This project uses the following tech stack:
-- Vite
-- Typescript
-- React Router v7 (all imports from `react-router` instead of `react-router-dom`)
-- React 19 (for frontend components)
-- Tailwind v4 (for styling)
-- Shadcn UI (for UI components library)
-- Lucide Icons (for icons)
-- Convex (for backend & database)
-- Convex Auth (for authentication)
-- Framer Motion (for animations)
-- Three js (for 3d models)
+**Concrete Ready-Mix Manager** — a premium, RTL-first (Arabic/English) operations platform for ready-mix concrete plants.
 
-All relevant files live in the 'src' directory.
+IConcrete covers the full plant workflow: daily production and quantities, mix pricing and profitability, quality control, raw-material inventory, fleet and equipment with predictive maintenance, demand forecasting, audit trails, and a role-based team workspace. Excel import/export with live cloud sync is built in.
 
-Use bun for the package manager.
+> واجهة عربية أولاً (RTL) مع تبديل كامل إلى الإنجليزية (LTR). الأرقام والعملات تُعرض بصيغة `ar-EG`/`en-GB` والأموال بالجنيه المصري (ج.م) والكميات بالمتر المكعب (م³).
 
-## Setup
+---
 
-This project is set up already and running on a cloud environment, as well as a convex development in the sandbox.
+## Table of contents
 
-## Environment Variables
+1. [Features](#features)
+2. [Tech stack](#tech-stack)
+3. [Project structure](#project-structure)
+4. [Getting started](#getting-started)
+5. [Environment variables](#environment-variables)
+6. [Available scripts](#available-scripts)
+7. [Authentication & roles](#authentication--roles)
+8. [Data & Excel workflow](#data--excel-workflow)
+9. [Deployment notes](#deployment-notes)
+10. [License](#license)
 
-The project is set up with project specific CONVEX_DEPLOYMENT and VITE_CONVEX_URL environment variables on the client side.
+---
 
-The convex server has a separate set of environment variables that are accessible by the convex backend.
+## Features
 
-Currently, these variables include auth-specific keys: JWKS, JWT_PRIVATE_KEY, and SITE_URL.
+| Area | What it does |
+| --- | --- |
+| **Dashboard** | Revenue, cost, margin, produced/delivered volumes with gradient charts, previous-window deltas, and quick actions. |
+| **Production** | Shift-level production log (morning / evening / night) with mix design, client, site, truck capacity (9 m³), and delivery status. |
+| **Quality** | Slump / temperature / cube-strength test records tied to production entries. |
+| **Inventory** | Materials, stock movements, suppliers, and standard costs. |
+| **Fleet & Maintenance** | Equipment registry, meter readings, daily usage, and predictive maintenance status. |
+| **Forecasting** | De-seasonalised linear fit × weekday factor with backtested MAE/MAPE. |
+| **Alerts** | Threshold-based alerts with optional Knock notification workflow. |
+| **Excel Pack** | 47 tables / 509 columns / 54 DAX measures exported as a ready-to-use workbook, plus live CSV/JSON export layer. |
+| **Excel Import** | Drag-and-drop `.xlsx` import with Arabic/Latin header aliases, per-row validation, preview, and server-side pricing. |
+| **Audit & Team** | Immutable audit log and role-based team management. |
+| **Access control** | Server-enforced permissions; roles without `viewFinancials` never receive money fields (redacted server-side). |
 
+---
 
-# Using Authentication (Important!)
+## Tech stack
 
-You must follow these conventions when using authentication.
+- **Runtime/tooling:** [Bun](https://bun.sh), Vite 7, TypeScript 5.9
+- **UI:** React 19, React Router v7 (imports from `react-router`), Tailwind CSS v4, shadcn/ui, Lucide icons, Framer Motion, Recharts
+- **Backend & database:** [Convex](https://convex.dev) (queries/mutations/actions, `src/convex/`)
+- **Auth:** Convex Auth (`@convex-dev/auth`) — email OTP + anonymous sessions
+- **Excel:** `xlsx` (SheetJS) for read/write, custom CSV/JSON export layer
+- **Quality:** ESLint 9 + Prettier
 
-## Auth is already set up.
+---
 
-All convex authentication functions are already set up. The auth currently uses email OTP and anonymous users, but can support more.
-
-The email OTP configuration is defined in `src/convex/auth/emailOtp.ts`. DO NOT MODIFY THIS FILE.
-
-Also, DO NOT MODIFY THESE AUTH FILES: `src/convex/auth.config.ts` and `src/convex/auth.ts`.
-
-## Using Convex Auth on the backend
-
-On the `src/convex/users.ts` file, you can use the `getCurrentUser` function to get the current user's data.
-
-## Using Convex Auth on the frontend
-
-The `/auth` page is already set up to use auth. Navigate to `/auth` for all log in / sign up sequences.
-
-You MUST use this hook to get user data. Never do this yourself without the hook:
-```typescript
-import { useAuth } from "@/hooks/use-auth";
-
-const { isLoading, isAuthenticated, user, signIn, signOut } = useAuth();
-```
-
-## Protected Routes
-
-The starter `/dashboard` route is protected with `RequireAuth`. Extend that page
-for the product's authenticated experience, and reuse `RequireAuth` when adding
-another protected route — do NOT hand-roll a redirect to `/auth`, since landing
-on a bare sign-in form with no explanation of what was blocked is confusing.
-
-`RequireAuth` states the block on the page the visitor asked for and sends them
-to `/auth?returnTo=<current route>` when they choose to sign in, so they come
-back to it. Pass `title` and `description` to say what the page is:
-
-```tsx
-<Route
-  path="/dashboard"
-  element={
-    <RequireAuth
-      title="Sign in to view your dashboard"
-      description="Your projects and settings live here."
-    >
-      <Dashboard />
-    </RequireAuth>
-  }
-/>
-```
-
-Pass `redirectImmediately` for a route where bouncing straight to `/auth` really
-is better.
-
-## Auth Page
-
-The auth page is defined in `src/pages/Auth.tsx`. Send sign-in and sign-up actions
-to `/auth`.
-
-## Authorization
-
-You can perform authorization checks on the frontend and backend.
-
-On the frontend, you can use the `useAuth` hook to get the current user's data and authentication state.
-
-You should also be protecting queries, mutations, and actions at the base level, checking for authorization securely.
-
-## Adding a redirect after auth
-
-The `/auth` route in `src/main.tsx` redirects to `/dashboard` by default. If the
-product's main authenticated route is different, update `redirectAfterAuth` to
-that route. A validated same-origin `returnTo` query parameter takes priority so
-users can resume the protected page they originally requested. Never leave an
-authenticated product redirecting back to the public landing page.
-
-## Complete authenticated products
-
-When the requested product implies accounts, a workspace, a dashboard, or other
-signed-in functionality, the task is not complete with only a landing page and
-auth form. Build the main authenticated experience, protect its route, and verify
-that signing in reaches it.
-
-# Frontend Conventions
-
-You will be using the Vite frontend with React 19, Tailwind v4, and Shadcn UI.
-
-Generally, pages should be in the `src/pages` folder, and components should be in the `src/components` folder.
-
-Shadcn primitives are located in the `src/components/ui` folder and should be used by default.
-
-## Page routing
-
-Your page component should go under the `src/pages` folder.
-
-When adding a page, update the react router configuration in `src/main.tsx` to include the new route you just added.
-
-## Shad CN conventions
-
-Follow these conventions when using Shad CN components, which you should use by default.
-- Remember to use "cursor-pointer" to make the element clickable
-- For title text, use the "tracking-tight font-bold" class to make the text more readable
-- Always make apps MOBILE RESPONSIVE. This is important
-- AVOID NESTED CARDS. Try and not to nest cards, borders, components, etc. Nested cards add clutter and make the app look messy.
-- AVOID SHADOWS. Avoid adding any shadows to components. stick with a thin border without the shadow.
-- Avoid skeletons; instead, use the loader2 component to show a spinning loading state when loading data.
-
-
-## Landing Pages
-
-You must always create good-looking designer-level styles to your application. 
-- Make it well animated and fit a certain "theme", ie neo brutalist, retro, neumorphism, glass morphism, etc
-
-Use known images and emojis from online.
-
-If the user is logged in already, show the get started button to say "Dashboard" or "Profile" instead to take them there.
-
-## Responsiveness and formatting
-
-Make sure pages are wrapped in a container to prevent the width stretching out on wide screens. Always make sure they are centered aligned and not off-center.
-
-Always make sure that your designs are mobile responsive. Verify the formatting to ensure it has correct max and min widths as well as mobile responsiveness.
-
-- Always create sidebars for protected dashboard pages and navigate between pages
-- Always create navbars for landing pages
-- On these bars, the created logo should be clickable and redirect to the index page
-
-## Animating with Framer Motion
-
-You must add animations to components using Framer Motion. It is already installed and configured in the project.
-
-To use it, import the `motion` component from `framer-motion` and use it to wrap the component you want to animate.
-
-
-### Other Items to animate
-- Fade in and Fade Out
-- Slide in and Slide Out animations
-- Rendering animations
-- Button clicks and UI elements
-
-Animate for all components, including on landing page and app pages.
-
-## Three JS Graphics
-
-Your app comes with three js by default. You can use it to create 3D graphics for landing pages, games, etc.
-
-
-## Colors
-
-You can override colors in: `src/index.css`
-
-This uses the oklch color format for tailwind v4.
-
-Always use these color variable names.
-
-Make sure all ui components are set up to be mobile responsive and compatible with both light and dark mode.
-
-Set theme using `dark` or `light` variables at the parent className.
-
-## Styling and Theming
-
-When changing the theme, always change the underlying theme of the shad cn components app-wide under `src/components/ui` and the colors in the index.css file.
-
-Avoid hardcoding in colors unless necessary for a use case, and properly implement themes through the underlying shad cn ui components.
-
-When styling, ensure buttons and clickable items have pointer-click on them (don't by default).
-
-Always follow a set theme style and ensure it is tuned to the user's liking.
-
-## Toasts
-
-You should always use toasts to display results to the user, such as confirmations, results, errors, etc.
-
-Use the shad cn Sonner component as the toaster. For example:
+## Project structure
 
 ```
-import { toast } from "sonner"
-
-import { Button } from "@/components/ui/button"
-export function SonnerDemo() {
-  return (
-    <Button
-      variant="outline"
-      onClick={() =>
-        toast("Event has been created", {
-          description: "Sunday, December 03, 2023 at 9:00 AM",
-          action: {
-            label: "Undo",
-            onClick: () => console.log("Undo"),
-          },
-        })
-      }
-    >
-      Show Toast
-    </Button>
-  )
-}
+.
+├── src/
+│   ├── components/          # App shell, shared UI, and shadcn/ui primitives (components/ui)
+│   ├── convex/              # Convex backend: schema, queries, mutations, actions, http, crons
+│   │   ├── _generated/      # Convex codegen (git-ignored, regenerate with `convex dev`)
+│   │   ├── auth.config.ts   # READ ONLY — platform auth configuration
+│   │   ├── auth.ts          # READ ONLY — Convex auth setup
+│   │   └── auth/emailOtp.ts # READ ONLY — email OTP provider
+│   ├── hooks/               # use-auth, use-access, use-branch, use-auto-seed, use-mobile
+│   ├── lib/                 # i18n, formatting, concrete math, CSV, xlsx, zip, excelPack/*
+│   ├── pages/               # Route screens (Landing, Auth, Dashboard, Production, ...)
+│   ├── types/               # Ambient type declarations
+│   ├── index.css            # Tailwind v4 theme tokens & utilities (single source of colour truth)
+│   └── main.tsx             # App entry: providers + router
+├── public/                  # Static assets (logo, web manifest)
+├── docs/                    # Architecture & data-model documentation
+├── index.html               # HTML shell (lang/dir are set pre-paint from localStorage)
+├── convex.json              # Convex functions directory config
+├── vite.config.ts           # Vite config (do not modify HMR settings)
+├── tsconfig*.json           # TypeScript project references
+└── LICENSE                  # MIT
 ```
 
-Remember to import { toast } from "sonner". Usage: `toast("Event has been created.")`
+> **Convention:** all app code lives under `src/`. Convex imports use the `@/convex/...` alias; shared client code uses `@/...`.
 
-## Dialogs
+---
 
-Always ensure your larger dialogs have a scroll in its content to ensure that its content fits the screen size. Make sure that the content is not cut off from the screen.
+## Getting started
 
-Ideally, instead of using a new page, use a Dialog instead. 
+### Prerequisites
 
-# Using the Convex backend
+- [Bun](https://bun.sh) ≥ 1.1
+- A [Convex](https://convex.dev) account (a deployment is provisioned automatically in the hosted environment)
 
-You will be implementing the convex backend. Follow your knowledge of convex and the documentation to implement the backend.
+### Install
 
-## The Convex Schema
-
-You must correctly follow the convex schema implementation.
-
-The schema is defined in `src/convex/schema.ts`.
-
-Do not include the `_id` and `_creationTime` fields in your queries (it is included by default for each table).
-Do not index `_creationTime` as it is indexed for you. Never have duplicate indexes.
-
-
-## Convex Actions: Using CRUD operations
-
-When running anything that involves external connections, you must use a convex action with "use node" at the top of the file.
-
-You cannot have queries or mutations in the same file as a "use node" action file. Thus, you must use pre-built queries and mutations in other files.
-
-You can also use the pre-installed internal crud functions for the database:
-
-```ts
-// in convex/users.ts
-import { crud } from "convex-helpers/server/crud";
-import schema from "./schema.ts";
-
-export const { create, read, update, destroy } = crud(schema, "users");
-
-// in some file, in an action:
-const user = await ctx.runQuery(internal.users.read, { id: userId });
-
-await ctx.runMutation(internal.users.update, {
-  id: userId,
-  patch: {
-    status: "inactive",
-  },
-});
+```bash
+bun install
 ```
 
+### Configure environment
 
-## Common Convex Mistakes To Avoid
+Copy the example file and fill in your deployment values (see [Environment variables](#environment-variables)):
 
-When using convex, make sure:
-- Document IDs are referenced as `_id` field, not `id`.
-- Document ID types are referenced as `Id<"TableName">`, not `string`.
-- Document object types are referenced as `Doc<"TableName">`.
-- Keep schemaValidation to false in the schema file.
-- You must correctly type your code so that it passes the type checker.
-- You must handle null / undefined cases of your convex queries for both frontend and backend, or else it will throw an error that your data could be null or undefined.
-- Always use the `@/folder` path, with `@/convex/folder/file.ts` syntax for importing convex files.
-- This includes importing generated files like `@/convex/_generated/server`, `@/convex/_generated/api`
-- Remember to import functions like useQuery, useMutation, useAction, etc. from `convex/react`
-- NEVER have return type validators.
+```bash
+cp .env.example .env.local
+```
+
+`VITE_CONVEX_URL` is the only value the frontend strictly needs to boot; the rest are set on the Convex deployment.
+
+### Run
+
+```bash
+# In one terminal: push Convex functions and keep codegen in sync
+bunx convex dev
+
+# In another terminal: start the Vite dev server
+bun run dev
+```
+
+Then open the dev server URL (default `http://localhost:5173`). The hosted Freebuff environment runs both processes for you automatically.
+
+---
+
+## Environment variables
+
+Variables consumed on the **client** (prefix `VITE_`) and on the **Convex deployment** are listed below. Never commit real values — `.gitignore` excludes `.env*` except `.env.example`.
+
+| Variable | Scope | Required | Purpose |
+| --- | --- | --- | --- |
+| `VITE_CONVEX_URL` | Client | Yes | Convex deployment URL used to create the Convex client. |
+| `CONVEX_SITE_URL` | Convex | Yes | Public site URL used by Convex Auth. |
+| `JWT_PRIVATE_KEY` / `JWKS` / `SITE_URL` | Convex | Yes (auth) | Convex Auth signing keys and site URL. |
+| `VLY_CONVEX_AUTH_ISSUER` | Client | No | Auth issuer override (defaults to `https://freebuff.com`). |
+| `ICONCRETE_EXPORT_TOKEN` | Convex | No | Bearer token for the live CSV/JSON export HTTP endpoint; endpoint returns `503` when unset. |
+| `KNOCK_API_KEY` | Convex | No | Knock API key for threshold alert notifications. |
+| `KNOCK_ALERT_WORKFLOW` | Convex | No | Knock workflow key used when dispatching alerts. |
+| `KNOCK_API_BASE` | Convex | No | Knock API base URL override. |
+| `VLY_INTEGRATION_KEY` | Convex | No | VLY integration gateway key (AI/email/payments). |
+| `VITE_VLY_APP_ID` / `VITE_VLY_MONITORING_URL` | Client | No | VLY app identity and monitoring endpoint. |
+| `VLY_APP_NAME` | Convex | No | Display name used in auth email content. |
+
+Secrets are managed through the project's Keys/API-keys UI in the hosted environment; do not edit `.env` files by hand there.
+
+---
+
+## Available scripts
+
+| Script | Command | Description |
+| --- | --- | --- |
+| `bun run dev` | `vite` | Start the dev server. |
+| `bun run build` | `tsc -b && vite build` | Type-check and build for production into `dist/`. |
+| `bun run typecheck` | `tsc -b --noEmit` | Type-check only. |
+| `bun run lint` | `eslint .` | Lint the project. |
+| `bun run format` | `prettier --write .` | Format the project. |
+| `bun run preview` | `vite preview` | Preview the production build. |
+
+> **Convex codegen:** after editing anything in `src/convex/`, run `bunx convex dev --once` to regenerate `src/convex/_generated/` before type-checking. Never hand-edit generated files.
+
+---
+
+## Authentication & roles
+
+- Auth is fully wired through Convex Auth. **Do not modify** `src/convex/auth.config.ts`, `src/convex/auth.ts`, or `src/convex/auth/emailOtp.ts`.
+- The first real email account becomes the **owner**; subsequent accounts get assigned roles by an owner/admin.
+- Guests (anonymous sessions) receive the working `GUEST_ROLE` (`manager`) with a limited capability set so the app is fully explorable in demo mode.
+- Protected routes use the `RequireAuth` wrapper, which sends signed-out users to `/auth?returnTo=<path>` and restores their destination after sign-in.
+- Financial fields are redacted **server-side** for any role lacking the `viewFinancials` capability (see `src/convex/production.ts` and `src/convex/imports.ts`).
+
+---
+
+## Data & Excel workflow
+
+- **Export:** the Excel Pack page generates a multi-sheet workbook (tables, columns, DAX measures). The live export layer serves CSV/JSON over Convex HTTP and requires `ICONCRETE_EXPORT_TOKEN`.
+- **Import:** `/import` accepts `.xlsx` files, maps Arabic/English headers, validates each row, shows a preview with issues, and commits valid rows to `productionLogs` with server-side pricing and audit entries.
+- **Demo data:** the app auto-seeds a realistic demo dataset once per session when the database is empty and the viewer can `manageTestData`; test records are flagged from `Test_Data_Flag` and can be cleared via `production.clearTestData`.
+
+---
+
+## Deployment notes
+
+- The app is a static SPA (`dist/`) plus a Convex backend. `main.ts` contains an optional Deno/Hono static server for self-hosting the built SPA.
+- `vite.config.ts` intentionally keeps `server.hmr` configured for the hosted runtime — do not change the HMR settings.
+- Vite manual chunking splits React, Convex, Radix, Framer Motion, Recharts, and forms into separate vendor chunks for faster loads.
+
+---
+
+## License
+
+Released under the [MIT License](./LICENSE).

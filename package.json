@@ -1,11 +1,14 @@
 {
-  "name": "vite-template",
+  "name": "iconcrete-fp",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "IConcrete System — ready-mix concrete plant management (production, quality, inventory, fleet, forecasting, and profitability).",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
     "preview": "vite preview"
