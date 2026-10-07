@@ -45,8 +45,8 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const redirect = resolveRedirectAfterAuth(
     searchParams.get("returnTo"),
     redirectAfterAuth,
-  );
-  const [step, setStep] = useState<"signIn" | { email: string }>("signIn");
+
+  const [step, setStep] = useState<{ email: string, phone: string }>(() => ({ email: "", phone: "" } as any))
   const [otp, setOtp] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +64,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     try {
       const formData = new FormData(event.currentTarget);
       await signIn("email-otp", formData);
-      setStep({ email: formData.get("email") as string });
+      setStep({ email: formData.get("email") as string, phone: formData.get("phone") as string });
       setIsLoading(false);
     } catch (error) {
       console.error("Email sign-in error:", error);
@@ -170,6 +170,17 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                         disabled={isLoading}
                         required
                       />
+                      </div>
+<div className="relative flex-1">
+  <Input
+    name="phone"
+    placeholder="رقم تليفون الموظف - 01xxxxxxxxx"
+    type="tel"
+    className="ps-9"
+    disabled={isLoading}
+    required
+  />
+</div>
                     </div>
                     <Button
                       type="submit"
