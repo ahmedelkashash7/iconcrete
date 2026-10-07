@@ -1,9 +1,8 @@
-export const query = (a:any)=>a;
-export const mutation = (a:any)=>a;
-export const action = (a:any)=>a;
-export const internalQuery = (a:any)=>a;
-export const internalMutation = (a:any)=>a;
-export const internalAction = (a:any)=>a;
-export type QueryCtx = any;
-export type MutationCtx = any;
-export type ActionCtx = any;
+export const query = (a:any) => a
+export const mutation = (a:any) => a
+export const action = (a:any) => a
+export const internalQuery = query
+export const internalMutation = mutation
+export const internalAction = action
+export const httpAction = (f:any) => f
+export const httpRouter = () => ({ route: ()=>{}, getRoutes: ()=>[] })
