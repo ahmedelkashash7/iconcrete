@@ -3,7 +3,7 @@ import { LanguageToggle } from "@/components/LanguageToggle";
 import { SyncStatus } from "@/components/SyncStatus";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { AskAIAgent} from "@./AskAIAgent";
+import AskAIAgent from "./AskAIAgent";
 import {
   DropdownMenu,
   DropdownMenuContent,
