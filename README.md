@@ -16,10 +16,11 @@ IConcrete covers the full plant workflow: daily production and quantities, mix p
 4. [Getting started](#getting-started)
 5. [Environment variables](#environment-variables)
 6. [Available scripts](#available-scripts)
-7. [Authentication & roles](#authentication--roles)
-8. [Data & Excel workflow](#data--excel-workflow)
-9. [Deployment notes](#deployment-notes)
-10. [License](#license)
+7. [Offline-first desktop app (Tauri + SQLite)](#offline-first-desktop-app-tauri--sqlite)
+8. [Authentication & roles](#authentication--roles)
+9. [Data & Excel workflow](#data--excel-workflow)
+10. [Deployment notes](#deployment-notes)
+11. [License](#license)
 
 ---
 
@@ -36,6 +37,9 @@ IConcrete covers the full plant workflow: daily production and quantities, mix p
 | **Alerts** | Threshold-based alerts with optional Knock notification workflow. |
 | **Excel Pack** | 47 tables / 509 columns / 54 DAX measures exported as a ready-to-use workbook, plus live CSV/JSON export layer. |
 | **Excel Import** | Drag-and-drop `.xlsx` import with Arabic/Latin header aliases, per-row validation, preview, and server-side pricing. |
+| **Section workbook** | `iConcrete_Template.xlsx` — ten Arabic sheets, one per app section, in the same order and with the same columns as the screens. Five sheets import back (materials, mixes, orders, stores, trucks & drivers); the rest are reports built from the same ledger. |
+| **Offline-first** | Every write lands in a local SQLite database first, then syncs to Convex. Works with the network cable unplugged, with an Online/Offline indicator, a pending-changes queue and a «مزامنة آخر اليوم — Sync End of Day» button. |
+| **Conflict handling** | Last-Write-Wins on timestamps; every overwritten value is written to the audit trail. |
 | **Audit & Team** | Immutable audit log and role-based team management. |
 | **Access control** | Server-enforced permissions; roles without `viewFinancials` never receive money fields (redacted server-side). |
 
@@ -59,16 +63,21 @@ IConcrete covers the full plant workflow: daily production and quantities, mix p
 ├── src/
 │   ├── components/          # App shell, shared UI, and shadcn/ui primitives (components/ui)
 │   ├── convex/              # Convex backend: schema, queries, mutations, actions, http, crons
-│   │   ├── _generated/      # Convex codegen (git-ignored, regenerate with `convex dev`)
+│   │   ├── _generated/      # Convex codegen — COMMITTED so a clean clone builds; regenerate with `convex dev --once`
+│   │   ├── sync.ts          # Offline sync: `pull` (cloud → SQLite) and `reportConflicts`
 │   │   ├── auth.config.ts   # READ ONLY — platform auth configuration
 │   │   ├── auth.ts          # READ ONLY — Convex auth setup
 │   │   └── auth/emailOtp.ts # READ ONLY — email OTP provider
-│   ├── hooks/               # use-auth, use-access, use-branch, use-auto-seed, use-mobile
-│   ├── lib/                 # i18n, formatting, concrete math, CSV, xlsx, zip, excelPack/*
-│   ├── pages/               # Route screens (Landing, Auth, Dashboard, Production, ...)
+│   ├── hooks/               # use-auth, use-access, use-branch, use-auto-seed, use-offline-sync
+│   ├── lib/
+│   │   ├── offline/         # schema.ts (SQLite mirror), db.ts (engine), syncService.ts (queue + syncAll)
+│   │   ├── excelSections.ts # iConcrete_Template.xlsx — the 10 section sheets
+│   │   └── ...              # i18n, formatting, concrete math, CSV, xlsx, zip, excelPack/*
+│   ├── pages/               # Route screens (Landing, Auth, Dashboard, Production, SyncCenter, ...)
 │   ├── types/               # Ambient type declarations
 │   ├── index.css            # Tailwind v4 theme tokens & utilities (single source of colour truth)
 │   └── main.tsx             # App entry: providers + router
+├── src-tauri/               # Desktop shell (Tauri v2): config, Rust crate, capabilities, icons
 ├── public/                  # Static assets (logo, web manifest)
 ├── docs/                    # Architecture & data-model documentation
 ├── index.html               # HTML shell (lang/dir are set pre-paint from localStorage)
@@ -147,12 +156,47 @@ Secrets are managed through the project's Keys/API-keys UI in the hosted environ
 | --- | --- | --- |
 | `bun run dev` | `vite` | Start the dev server. |
 | `bun run build` | `tsc -b && vite build` | Type-check and build for production into `dist/`. |
-| `bun run typecheck` | `tsc -b --noEmit` | Type-check only. |
+| `bun run typecheck` | `tsc -b --noEmit` | Type-check the client project. |
+| `bun run typecheck:convex` | `tsc -p src/convex/tsconfig.json --noEmit` | Type-check the Convex functions. |
 | `bun run lint` | `eslint .` | Lint the project. |
 | `bun run format` | `prettier --write .` | Format the project. |
 | `bun run preview` | `vite preview` | Preview the production build. |
+| `bun run tauri` | `tauri` | Tauri CLI (`bun run tauri build`, `bun run tauri dev`). |
+| `bun run desktop:dev` | `tauri dev` | Run the desktop app against the Vite dev server. |
+| `bun run desktop:build` | `tauri build` | Build the desktop installers (`.exe` / `.msi` on Windows). |
 
-> **Convex codegen:** after editing anything in `src/convex/`, run `bunx convex dev --once` to regenerate `src/convex/_generated/` before type-checking. Never hand-edit generated files.
+> **Convex codegen:** after editing anything in `src/convex/`, run `bunx convex dev --once` to regenerate `src/convex/_generated/` before type-checking. Never hand-edit generated files — and never commit a hand-written replacement for them.
+
+---
+
+## Offline-first desktop app (Tauri + SQLite)
+
+The same React bundle powers the Vercel deployment and the Windows desktop app, and both share the same Convex backend through `VITE_CONVEX_URL`. The desktop build adds one thing: a local SQLite database (`iconcrete.db`) that keeps the plant running with no internet.
+
+```bash
+bun install
+bun run desktop:dev            # develop the desktop shell
+bun run tauri build            # produce .exe / .msi installers (Windows)
+```
+
+Building installers requires the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for the target OS (Rust toolchain, plus the WebView2 / WebKit runtime).
+
+### How a write travels
+
+```
+UI action ──► SQLite (local row, _dirty = 1) ──► sync_queue (status = pending)
+                                                     │
+                        online?  ──► push through the normal Convex mutation ──► mark synced
+                        offline? ──► stays pending until «مزامنة آخر اليوم»
+```
+
+- `src/lib/offline/schema.ts` — the SQLite mirror. Every mirrored table keeps the **exact same field names** as `src/convex/schema.ts`, plus `_creationTime`, `_updatedAt`, `_dirty`, `_deleted` and `_syncedAt`.
+- `src/lib/offline/db.ts` — one API, two engines: real SQLite via `@tauri-apps/plugin-sql` on the desktop, and an in-memory + `localStorage` mirror in the browser, so the deployed web app behaves identically.
+- `src/lib/offline/syncService.ts` — `sync_queue`, `writeLocalFirst`, `flushPending`, `pullAndMerge` and `syncAll`. Pushes reuse the plant's own mutations, so validation, pricing and auditing are never bypassed.
+- `src/convex/sync.ts` — `pull` (cloud state of every mirrored table, with money redacted for roles without `viewFinancials`) and `reportConflicts` (Last-Write-Wins decisions written to `auditLogs`).
+- `/sync` — the sync centre: connection state, storage engine, pending queue and the button.
+
+**Sync order matters:** `syncAll()` merges first (so a stale local edit can never overwrite newer cloud data), then pushes everything still pending. Conflicts are resolved Last-Write-Wins on timestamps and logged.
 
 ---
 
@@ -168,8 +212,10 @@ Secrets are managed through the project's Keys/API-keys UI in the hosted environ
 
 ## Data & Excel workflow
 
+- **Section workbook (`iConcrete_Template.xlsx`):** ten Arabic sheets in app order — `العملاء` · `الموردين` · `المواد` · `الخلطات` · `الطلبيات` · `الانتاج اليومي` · `الفواتير` · `المخازن` · `المصروفات` · `الشاحنات والسائقين` — each with the same columns the screen shows, plus a `دليل الأعمدة` guide and a `المزامنة` sheet. Download the empty template or export the plant's live figures into the same layout from `/import`.
+- **Two-way sync:** the importable sheets (`المواد`, `الخلطات`, `الطلبيات`, `المخازن`, `الشاحنات والسائقين`) go Excel → SQLite → Convex through the same local-first queue, so an uploaded file is never lost if the machine is offline. The remaining sheets (`العملاء`, `الموردين`, `الانتاج اليومي`, `الفواتير`, `المصروفات`) are reports computed from the same ledger, so they can never disagree with the screens.
 - **Export:** the Excel Pack page generates a multi-sheet workbook (tables, columns, DAX measures). The live export layer serves CSV/JSON over Convex HTTP and requires `ICONCRETE_EXPORT_TOKEN`.
-- **Import:** `/import` accepts `.xlsx` files, maps Arabic/English headers, validates each row, shows a preview with issues, and commits valid rows to `productionLogs` with server-side pricing and audit entries.
+- **Quick import:** `/import` also accepts a plain production file, maps Arabic/English headers, validates each row, shows a preview with issues, and commits valid rows with server-side pricing and audit entries.
 - **Demo data:** the app auto-seeds a realistic demo dataset once per session when the database is empty and the viewer can `manageTestData`; test records are flagged from `Test_Data_Flag` and can be cleared via `production.clearTestData`.
 
 ---
@@ -177,8 +223,11 @@ Secrets are managed through the project's Keys/API-keys UI in the hosted environ
 ## Deployment notes
 
 - The app is a static SPA (`dist/`) plus a Convex backend. `main.ts` contains an optional Deno/Hono static server for self-hosting the built SPA.
-- `vite.config.ts` intentionally keeps `server.hmr` configured for the hosted runtime — do not change the HMR settings.
-- Vite manual chunking splits React, Convex, Radix, Framer Motion, Recharts, and forms into separate vendor chunks for faster loads.
+- **Vercel:** set `VITE_CONVEX_URL` in the project's environment variables (Build & Development). Without it the bundle boots against an empty client and every table looks empty. `src/convex/_generated/` is committed, so the build does not need Convex credentials to type-check.
+- **Desktop:** the Tauri build produces the same `dist/` inside a native shell and shares the same Convex deployment, so web and desktop users see the same data.
+- Do not remove the GitHub → Vercel auto-deploy integration; pushing to the default branch is the release mechanism for the web build.
+- Do not change the HMR settings in `vite.config.ts`; the hosted runtime requires them as configured.
+- Keep an eye on the `dist/assets/chart-*` and `index-*` chunks when adding large dependencies — the build warns above 500 kB.
 
 ---
 

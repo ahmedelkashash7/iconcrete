@@ -1,5 +1,6 @@
 import { BrandLockup, BrandMark } from "@/components/BrandMark";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { SyncStatus } from "@/components/SyncStatus";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +30,7 @@ import {
   BellRing,
   Boxes,
   CalendarDays,
+  CloudOff,
   FileSpreadsheet,
   FileUp,
   FlaskConical,
@@ -107,6 +109,16 @@ const APP_NAV: NavItem[] = [
     hint: { ar: "رفع ملف Excel وتحديث الكلاود فورًا", en: "Upload Excel and sync the cloud instantly" },
     icon: FileUp,
     audience: { ar: "المشغّل والمراجع", en: "Operator & reviewer" },
+  },
+  {
+    to: "/sync",
+    labelKey: "nav.sync",
+    hint: {
+      ar: "طابور التغييرات وقاعدة البيانات المحلية والمزامنة",
+      en: "Offline queue, local database and sync",
+    },
+    icon: CloudOff,
+    audience: { ar: "المشغّل والمدير", en: "Operator & manager" },
   },
   {
     to: "/settings",
@@ -420,6 +432,7 @@ export function AppShell({
               ).format(new Date())}
             </span>
           </span>
+          <SyncStatus />
           <LanguageToggle />
           <UserMenu />
         </header>

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "iConcrete",
+  "version": "1.0.0",
+  "identifier": "com.iconcrete.app",
+  "build": {
+    "beforeDevCommand": "bun run dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "bun run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "iConcrete System — نظام إدارة محطة الخرسانة",
+        "width": 1440,
+        "height": 920,
+        "minWidth": 1024,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "decorations": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "publisher": "IConcrete System",
+    "copyright": "Copyright (c) 2026 IConcrete System",
+    "category": "Business",
+    "shortDescription": "Ready-mix concrete plant management",
+    "longDescription": "iConcrete System manages the ready-mix concrete plant end to end — production and dispatch, quality testing, material stores, fleet and maintenance, forecasting and profitability — and keeps working offline with a local SQLite database that syncs to Convex.",
+    "windows": {
+      "nsis": {
+        "installMode": "perMachine",
+        "languages": ["Arabic", "English"],
+        "displayLanguageSelector": true
+      },
+      "wix": {
+        "language": ["ar-SA", "en-US"]
+      }
+    }
+  },
+  "plugins": {
+    "sql": {
+      "preload": ["sqlite:iconcrete.db"]
+    }
+  }
+}

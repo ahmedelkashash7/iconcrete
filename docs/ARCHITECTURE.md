@@ -76,6 +76,53 @@ with `isTestData` (sourced from `Test_Data_Flag`) so they can be cleared in bulk
 These modules are reviewed and internally consistent; ratios, margins, and
 forecast formulas were verified during the final review.
 
+## 5b. Offline-first layer (desktop + web)
+
+```
+React screen ──► writeLocalFirst()
+                     │
+                     ├──► local DB (SQLite on desktop / memory+localStorage on web)
+                     └──► sync_queue (pending)
+                              │
+              online  ──► flushPending() → existing Convex mutation → synced
+              offline ──► stays pending until «مزامنة آخر اليوم»
+```
+
+| File | Responsibility |
+| --- | --- |
+| `src/lib/offline/schema.ts` | SQLite DDL mirroring `src/convex/schema.ts` with identical field names, plus `sync_queue` and `local_meta`. Tables flagged `localOnly` (`customers`, `suppliers`, `batches`, `invoices`, `expenses`, `warehouses`, `inventory`, `maintenanceRecords`) are stored on the device but have **no Convex counterpart yet**, so they are neither pushed nor pulled — their Excel sheets are aggregates of the real ledger. |
+| `src/lib/offline/db.ts` | `LocalDb` adapter — `@tauri-apps/plugin-sql` on desktop, memory + `localStorage` in the browser. |
+| `src/lib/offline/syncService.ts` | Queue, `writeLocalFirst`, `flushPending`, `pullAndMerge`, `syncAll` (merge → push), `probeCloud`. |
+| `src/convex/sync.ts` | `pull` (cloud → client, money redacted by capability) and `reportConflicts` (LWW decisions → `auditLogs`). |
+| `src/hooks/use-offline-sync.ts` | Connection, queue depth, last-sync timestamp and the sync action. |
+| `src/components/SyncStatus.tsx` | Header indicator + «مزامنة آخر اليوم» button. |
+| `src/pages/SyncCenter.tsx` | `/sync` — queue view, local mirror counts, engine and flow documentation. |
+
+**Conflict rule:** Last-Write-Wins on `_updatedAt` (falling back to `_creationTime`). A dirty local row older than the cloud copy is dropped from the queue and the cloud value is kept; otherwise the local value is pushed. Both outcomes are written to `auditLogs`.
+
+**Guarantee preserved:** the queue never writes to Convex directly. It replays the same guarded mutations the screens use (`production.create`, `inventory.createMaterial`, `settings.upsertMix`, `forecast.createEquipment`, …), so pricing, capability checks and audit entries apply identically offline and online.
+
+---
+
+## 5c. Section workbook (`iConcrete_Template.xlsx`)
+
+`src/lib/excelSections.ts` is the single definition of the workbook: ten Arabic sheets in app order, each with the same column order as its screen. `buildIconcreteWorkbook(data)` builds it (empty template or live figures), `parseIconcreteWorkbook(file)` reads it back section by section.
+
+| Sheet | App route | Source | Direction |
+| --- | --- | --- | --- |
+| `العملاء` | `/dashboard` | aggregate of `productionLogs` | export |
+| `الموردين` | `/inventory` | `materials.supplier` + receipts | export |
+| `المواد` | `/inventory` | `materials` | both |
+| `الخلطات` | `/settings` | `mixPrices` | both |
+| `الطلبيات` | `/production` | `productionLogs` | both |
+| `الانتاج اليومي` | `/production` | aggregate by date + shift | export |
+| `الفواتير` | `/dashboard` | aggregate by customer + month (VAT 14 %) | export |
+| `المخازن` | `/inventory` | `materialMovements` (material resolved by name) | both |
+| `المصروفات` | `/dashboard` | valued receipts | export |
+| `الشاحنات والسائقين` | `/forecast` | `equipment` + driver fields | both |
+
+---
+
 ## 6. Internationalisation
 
 - `src/lib/i18n.tsx` provides `LanguageProvider` and `useI18n()`

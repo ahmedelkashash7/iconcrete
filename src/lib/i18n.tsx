@@ -39,6 +39,7 @@ const DICT: Record<string, { ar: string; en: string }> = {
   "nav.alerts": { ar: "التنبيهات والحدود", en: "Alerts & thresholds" },
   "nav.settings": { ar: "إعدادات المحطة", en: "Plant settings" },
   "nav.import": { ar: "استيراد Excel", en: "Excel import" },
+  "nav.sync": { ar: "مركز المزامنة", en: "Sync centre" },
   "nav.excelPack": { ar: "حزمة Excel / Power", en: "Excel / Power pack" },
   "nav.team": { ar: "الفريق والصلاحيات", en: "Team & roles" },
   "nav.audit": { ar: "سجل التتبع", en: "Audit trail" },

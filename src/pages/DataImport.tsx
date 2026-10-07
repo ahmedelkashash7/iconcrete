@@ -13,6 +13,17 @@ import {
 } from "@/components/ui/table";
 import { api } from "@/convex/_generated/api";
 import { useBranch } from "@/hooks/use-branch";
+import { getLocalDb } from "@/lib/offline/db";
+import type { LocalRow } from "@/lib/offline/db";
+import { isTauri } from "@/lib/offline/db";
+import { lastSyncAt, pullAndMerge, writeLocalFirst } from "@/lib/offline/syncService";
+import {
+  ICONCRETE_TEMPLATE_FILENAME,
+  buildIconcreteWorkbook,
+  isIconcreteWorkbook,
+  parseIconcreteWorkbook,
+} from "@/lib/excelSections";
+import type { SectionData, WorkbookImport } from "@/lib/excelSections";
 import { SHIFT_SHORT_LABELS, STATUS_LABELS } from "@/lib/concrete";
 import type { LogStatus, Shift } from "@/lib/concrete";
 import { errorMessage as readError } from "@/lib/errors";
@@ -22,17 +33,21 @@ import type { ParsedLogRow, ParseResult } from "@/lib/xlsx";
 import {
   buildTemplateWorkbook,
   downloadBlob,
+  listSheets,
   mapRows,
   readWorkbookRows,
 } from "@/lib/xlsx";
 import { cn } from "@/lib/utils";
-import { useMutation, useQuery } from "convex/react";
+import { useConvex, useMutation, useQuery } from "convex/react";
 import {
   AlertTriangle,
   CheckCircle2,
   Cloud,
+  Database,
   Download,
   FileSpreadsheet,
+  HardDriveDownload,
+  Layers,
   Loader2,
   RefreshCw,
   Upload,
@@ -45,12 +60,18 @@ type Phase = "idle" | "parsing" | "ready" | "importing" | "done";
 export default function DataImport() {
   const { t, pick } = useI18n();
   const { branches, branchId, setBranchId } = useBranch();
+  const client = useConvex();
   const importProduction = useMutation(api.imports.importProduction);
   const status = useQuery(api.imports.importStatus);
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [fileName, setFileName] = useState<string | null>(null);
   const [parsed, setParsed] = useState<ParseResult | null>(null);
+  const [workbook, setWorkbook] = useState<WorkbookImport | null>(null);
+  const [sheetReport, setSheetReport] = useState<{
+    saved: number;
+    errors: Array<{ sheet: string; row: number; message: string }>;
+  } | null>(null);
   const [result, setResult] = useState<{
     inserted: number;
     skipped: number;
@@ -65,8 +86,25 @@ export default function DataImport() {
     if (!file) return;
     setPhase("parsing");
     setResult(null);
+    setSheetReport(null);
     setFileName(file.name);
     try {
+      const sheets = await listSheets(file);
+      if (isIconcreteWorkbook(sheets)) {
+        const bulk = await parseIconcreteWorkbook(file);
+        setWorkbook(bulk);
+        setParsed(null);
+        setPhase("ready");
+        toast.success(
+          pick(
+            `تم قراءة نموذج الأقسام (${formatNumber(bulk.sections.length)} أوراق)`,
+            `Section workbook parsed (${formatNumber(bulk.sections.length)} sheets)`,
+          ),
+        );
+        return;
+      }
+
+      setWorkbook(null);
       const raw = await readWorkbookRows(file);
       const mapped = mapRows(raw);
       setParsed(mapped);
@@ -119,6 +157,8 @@ export default function DataImport() {
     setPhase("idle");
     setParsed(null);
     setResult(null);
+    setWorkbook(null);
+    setSheetReport(null);
     setFileName(null);
     if (inputRef.current) inputRef.current.value = "";
   };
@@ -126,6 +166,98 @@ export default function DataImport() {
   const downloadTemplate = () => {
     downloadBlob("iconcrete-import-template.xlsx", buildTemplateWorkbook(true));
     toast.success(pick("تم تنزيل نموذج الإدخال", "Template downloaded"));
+  };
+
+  /** التنزيل: نموذج الأقسام العشرة (فارغ أو ببيانات النظام الحالية). */
+  const downloadSectionWorkbook = async (withData: boolean) => {
+    try {
+      let data: SectionData = {};
+      if (withData) {
+        const pulled = (await client.query(api.sync.pull as never, {} as never)) as unknown as {
+          rows: Record<string, LocalRow[]>;
+        };
+        data = (pulled.rows ?? {}) as SectionData;
+      }
+      const blob = buildIconcreteWorkbook(data, {
+        lastSync: await lastSyncAt(),
+        engine: isTauri() ? "SQLite" : "ذاكرة المتصفح",
+      });
+      downloadBlob(ICONCRETE_TEMPLATE_FILENAME, blob);
+      toast.success(
+        withData
+          ? pick("تم تصدير بيانات النظام إلى Excel", "System data exported to Excel")
+          : pick("تم تنزيل نموذج الأقسام (10 أوراق)", "Section workbook downloaded (10 sheets)"),
+      );
+    } catch (error) {
+      toast.error(readError(error, pick("تعذر بناء الملف", "Could not build the file")));
+    }
+  };
+
+  /**
+   * تثبيت أوراق الأقسام: كل سطر يُحفظ في قاعدة البيانات المحلية ثم يُرسل إلى
+   * Convex، بنفس قواعد الحفظ اليدوي.
+   */
+  const commitWorkbook = async () => {
+    if (!workbook) return;
+    setPhase("importing");
+    const errors: Array<{ sheet: string; row: number; message: string }> = [];
+    let saved = 0;
+
+    try {
+      // حركة المخازن تشير إلى مادة بالاسم — ننزّل القائمة المحلية أولاً.
+      await pullAndMerge(client);
+      const localMaterials = (await getLocalDb().all("materials")) as LocalRow[];
+      const byName = new Map(
+        localMaterials.map((material) => [String(material.name ?? "").trim(), String(material._id)]),
+      );
+
+      for (const section of workbook.sections) {
+        section.issues.forEach((issue) =>
+          errors.push({ sheet: section.sheet, row: issue.row, message: issue.message }),
+        );
+
+        for (const raw of section.rows) {
+          const payload: LocalRow = { ...raw };
+          delete payload._table;
+          delete payload._materialName;
+
+          if (section.tableName === "materialMovements") {
+            const materialName = String(raw._materialName ?? "").trim();
+            const materialId = byName.get(materialName);
+            if (!materialId) {
+              errors.push({
+                sheet: section.sheet,
+                row: 0,
+                message: `المادة «${materialName}» غير مسجّلة في قائمة المواد`,
+              });
+              continue;
+            }
+            payload.materialId = materialId;
+          }
+
+          const outcome = await writeLocalFirst(section.tableName, "create", payload, {
+            flush: client,
+          });
+          if (outcome.error) {
+            errors.push({ sheet: section.sheet, row: 0, message: outcome.error });
+          } else {
+            saved += 1;
+          }
+        }
+      }
+
+      setSheetReport({ saved, errors: errors.slice(0, 30) });
+      setPhase("done");
+      toast.success(
+        pick(
+          `تم حفظ ${formatNumber(saved)} سطرًا محليًا وإرسالها إلى الكلاود`,
+          `Saved ${formatNumber(saved)} rows locally and pushed them to the cloud`,
+        ),
+      );
+    } catch (error) {
+      setPhase("ready");
+      toast.error(readError(error, pick("تعذر استيراد الأقسام", "Section import failed")));
+    }
   };
 
   const importable = (parsed?.rows.length ?? 0) > 0;
@@ -142,9 +274,17 @@ export default function DataImport() {
       actions={
         <>
           <BranchFilter branches={branches} value={branchId} onChange={setBranchId} />
+          <Button variant="outline" onClick={() => void downloadSectionWorkbook(false)}>
+            <Layers className="size-4" />
+            {pick("نموذج الأقسام (10 أوراق)", "Section workbook (10 sheets)")}
+          </Button>
+          <Button variant="outline" onClick={() => void downloadSectionWorkbook(true)}>
+            <HardDriveDownload className="size-4" />
+            {pick("تصدير بيانات النظام", "Export system data")}
+          </Button>
           <Button variant="outline" onClick={downloadTemplate}>
             <Download className="size-4" />
-            {pick("تنزيل النموذج", "Download template")}
+            {pick("نموذج الإنتاج السريع", "Quick production template")}
           </Button>
         </>
       }
@@ -181,7 +321,7 @@ export default function DataImport() {
             "Accepts .xlsx, .xls and .csv — the same import template.",
           )}
           action={
-            parsed ? (
+            parsed || workbook ? (
               <Button variant="ghost" size="sm" onClick={reset} className="cursor-pointer">
                 {pick("إعادة الضبط", "Reset")}
               </Button>
@@ -277,6 +417,106 @@ export default function DataImport() {
                 )}
                 {pick("ثبّت على الكلاود الآن", "Commit to the cloud now")}
               </Button>
+            </div>
+          )}
+
+          {/* نموذج الأقسام: ملخص لكل ورقة ثم تثبيت واحد */}
+          {workbook && (
+            <div className="mt-4 rounded-2xl border border-border/70 bg-muted/30 p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <Badge
+                  variant="outline"
+                  className="gap-1.5 border-brand/40 bg-brand/10 text-brand"
+                >
+                  <Layers className="size-3.5" />
+                  {pick(
+                    `${formatNumber(workbook.sections.length)} أوراق · ${formatNumber(
+                      workbook.sections.reduce((total, section) => total + section.rows.length, 0),
+                    )} سطرًا`,
+                    `${formatNumber(workbook.sections.length)} sheets · ${formatNumber(
+                      workbook.sections.reduce((total, section) => total + section.rows.length, 0),
+                    )} rows`,
+                  )}
+                </Badge>
+                {workbook.totalIssues > 0 && (
+                  <Badge
+                    variant="outline"
+                    className="gap-1.5 border-destructive/40 bg-destructive/10 text-destructive"
+                  >
+                    <AlertTriangle className="size-3.5" />
+                    {pick(
+                      `${formatNumber(workbook.totalIssues)} سطرًا سيُتخطّى`,
+                      `${formatNumber(workbook.totalIssues)} rows will be skipped`,
+                    )}
+                  </Badge>
+                )}
+                <span className="text-xs text-muted-foreground">
+                  {pick(
+                    "تُحفظ في SQLite أولًا ثم تُرسل إلى Convex",
+                    "Stored in SQLite first, then pushed to Convex",
+                  )}
+                </span>
+              </div>
+
+              <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">
+                {workbook.sections.map((section) => (
+                  <li
+                    key={section.id}
+                    className="flex items-center justify-between gap-3 rounded-lg bg-background/70 px-3 py-2 text-xs"
+                  >
+                    <span className="font-medium">{section.sheet}</span>
+                    <span className="text-muted-foreground">
+                      {formatNumber(section.rows.length)} {pick("سطرًا", "rows")}
+                      {section.issues.length > 0 && (
+                        <span className="text-destructive">
+                          {" "}
+                          · {formatNumber(section.issues.length)} {pick("خطأ", "errors")}
+                        </span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Button
+                  onClick={commitWorkbook}
+                  disabled={phase === "importing" || workbook.sections.every((s) => s.rows.length === 0)}
+                >
+                  {phase === "importing" ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Database className="size-4" />
+                  )}
+                  {pick("احفظ محليًا وأرسل إلى الكلاود", "Save locally and push to the cloud")}
+                </Button>
+                <span className="text-[11px] text-muted-foreground">
+                  {pick(
+                    "الأوراق القابلة للاستيراد: المواد · الخلطات · الطلبيات · المخازن · الشاحنات والسائقين",
+                    "Importable sheets: materials, mixes, orders, stores, trucks & drivers",
+                  )}
+                </span>
+              </div>
+
+              {sheetReport && (
+                <div className="mt-3 rounded-xl border border-success/40 bg-success/10 p-3 text-xs">
+                  <p className="font-semibold text-success">
+                    {pick(
+                      `تم حفظ ${formatNumber(sheetReport.saved)} سطرًا`,
+                      `${formatNumber(sheetReport.saved)} rows saved`,
+                    )}
+                  </p>
+                  {sheetReport.errors.length > 0 && (
+                    <ul className="mt-2 space-y-1 text-destructive">
+                      {sheetReport.errors.slice(0, 8).map((issue, index) => (
+                        <li key={`${issue.sheet}-${index}`}>
+                          {issue.sheet}: {issue.message}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

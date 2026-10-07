@@ -17,7 +17,10 @@ build
 *.tsbuildinfo
 
 # --- Convex generated files ---
-src/convex/_generated
+# The generated client API is intentionally committed: Vercel type-checks the
+# project on a clean clone before any codegen can run, so the real files must be
+# in the repo. Regenerate instead of hand-editing:
+#   npx convex codegen   (or: npx convex dev --once)
 
 # --- Logs ---
 logs
@@ -46,3 +49,14 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea
+
+# --- Tauri desktop build ---
+src-tauri/target
+src-tauri/gen
+src-tauri/icons/android
+src-tauri/icons/ios
+
+# --- Offline database (local only, never part of the source) ---
+*.db
+*.db-shm
+*.db-wal

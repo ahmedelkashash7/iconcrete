@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { EnrichedLog } from "@/convex/measures";
 import type { BranchOption } from "@/hooks/use-branch";
@@ -42,8 +41,9 @@ import {
   formatSignedEGP,
   todayISO,
 } from "@/lib/format";
+import { isOnline, writeLocalFirst } from "@/lib/offline/syncService";
 import { cn } from "@/lib/utils";
-import { useMutation } from "convex/react";
+import { useConvex } from "convex/react";
 import { Loader2, Lock, Save } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent, ReactNode } from "react";
@@ -155,8 +155,7 @@ function ProductionForm({
 }) {
   const access = useAccess();
   const financialsVisible = access.can("viewFinancials");
-  const createLog = useMutation(api.production.create);
-  const updateLog = useMutation(api.production.update);
+  const client = useConvex();
   const [form, setForm] = useState<FormState>(() =>
     buildInitialState(log, defaultDate, defaultBranchId),
   );
@@ -249,13 +248,35 @@ function ProductionForm({
         status: form.status,
         notes: form.notes.trim() || undefined,
       };
-      if (log) {
-        await updateLog({ id: log._id, ...payload });
-        toast.success("تم تحديث قيد الإنتاج");
-      } else {
-        await createLog(payload);
-        toast.success("تم تسجيل قيد الإنتاج");
+      // Offline-first: the row is written to the local database and queued, and
+      // when the machine is online the queue is pushed to Convex immediately.
+      const outcome = await writeLocalFirst(
+        "productionLogs",
+        log ? "update" : "create",
+        {
+          ...(log ? { _id: String(log._id) } : {}),
+          ...payload,
+          isTestData: false,
+        },
+        { flush: client },
+      );
+
+      if (outcome.error) {
+        setError(outcome.error);
+        toast.error(`${outcome.error} — حُفظ محليًا وسيُعاد إرساله`);
+        onDone();
+        return;
       }
+
+      const offline = !isOnline();
+      const message = log
+        ? offline
+          ? "تم تحديث قيد الإنتاج محليًا — ستُزامن عند عودة الشبكة"
+          : "تم تحديث قيد الإنتاج"
+        : offline
+          ? "تم تسجيل قيد الإنتاج محليًا — ستُزامن عند عودة الشبكة"
+          : "تم تسجيل قيد الإنتاج";
+      toast.success(message);
       onDone();
     } catch (submitError) {
       const message = readError(submitError, "تعذر حفظ قيد الإنتاج");
