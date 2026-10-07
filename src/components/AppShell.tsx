@@ -463,6 +463,7 @@ export function AppShell({
           <div className="mt-6">{children}</div>
         </main>
       </div>
+      <AskAIAgent />
     </div>
   );
 }
