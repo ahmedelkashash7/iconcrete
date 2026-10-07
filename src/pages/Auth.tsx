@@ -18,7 +18,7 @@ import {
 
 import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/lib/i18n";
-import { ArrowLeft, ArrowRight, Loader2, Mail, UserX } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Mail, UserX, Phone } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
@@ -45,8 +45,9 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const redirect = resolveRedirectAfterAuth(
     searchParams.get("returnTo"),
     redirectAfterAuth,
+  );
 
-  const [step, setStep] = useState<{ email: string, phone: string }>(() => ({ email: "", phone: "" } as any))
+  const [step, setStep] = useState<{ email: string; phone: string }>({ email: "", phone: "" });
   const [otp, setOtp] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,14 +65,17 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     try {
       const formData = new FormData(event.currentTarget);
       await signIn("email-otp", formData);
-      setStep({ email: formData.get("email") as string, phone: formData.get("phone") as string });
+      setStep({
+        email: formData.get("email") as string,
+        phone: formData.get("phone") as string,
+      });
       setIsLoading(false);
     } catch (error) {
       console.error("Email sign-in error:", error);
       setError(
         error instanceof Error
           ? error.message
-          : pick("تعذر إرسال كود التحقق. حاول مرة أخرى.", "Could not send the code. Try again."),
+          : pick("تعذر إرسال كود التحقق. حاول مرة أخرى.", "Could not send the code."),
       );
       setIsLoading(false);
     }
@@ -84,22 +88,17 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     try {
       const formData = new FormData(event.currentTarget);
       await signIn("email-otp", formData);
-
       console.log("signed in");
-
       navigate(redirect);
     } catch (error) {
       console.error("OTP verification error:", error);
-
       setError(
         pick(
-          "كود التحقق غير صحيح، تأكد من الأرقام الستة في البريد.",
-          "Incorrect code — check the six digits in your email.",
+          "كود التحقق غير صحيح. تأكد من الأرقام الستة في البريد.",
+          "Incorrect code - check the six digits in your email.",
         ),
       );
-
       setIsLoading(false);
-
       setOtp("");
     }
   };
@@ -114,8 +113,8 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
       console.error("Guest login error:", error);
       setError(
         pick(
-          `تعذر الدخول كزائر: ${error instanceof Error ? error.message : "خطأ غير معروف"}`,
-          `Guest sign-in failed: ${error instanceof Error ? error.message : "unknown error"}`,
+          `تعذر الدخول كزائر. ${error instanceof Error ? error.message : ""}`,
+          `Guest sign-in failed: ${error instanceof Error ? error.message : ""}`,
         ),
       );
       setIsLoading(false);
@@ -124,14 +123,9 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
 
   return (
     <div className="relative flex min-h-screen flex-col bg-background">
-      <div className="bp-grid pointer-events-none absolute inset-0 opacity-60 [mask-image:radial-gradient(ellipse_at_50%_0%,black,transparent_70%)]" />
-
-      <header className="relative mx-auto flex h-16 w-full max-w-6xl items-center gap-3 px-4 sm:px-6">
-        <button
-          type="button"
-          onClick={() => navigate("/")}
-          aria-label={pick("الصفحة الرئيسية", "Home")}
-        >
+      <div className="bp-grid pointer-events-none absolute inset-0 opacity-[0.03]" />
+      <header className="relative mx-auto flex h-16 w-full max-w-6xl items-center px-6">
+        <button type="button" onClick={() => navigate("/")} aria-label={pick("الصفحة الرئيسية", "Home")}>
           <BrandLockup subtitle={null} />
         </button>
         <div className="ms-auto">
@@ -139,63 +133,61 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
         </div>
       </header>
 
-      <div className="relative flex flex-1 items-center justify-center px-4 pb-16">
-        <Card className="w-full max-w-md gap-0 overflow-hidden border-border/70 py-0 shadow-lg">
-          {step === "signIn" ? (
+      <div className="relative flex flex-1 items-center justify-center p-6">
+        <Card className="w-full max-w-md gap-0 overflow-hidden border-border">
+          {step.email === "" ? (
             <>
               <CardHeader className="gap-2 px-6 pt-7 text-center">
                 <div className="flex justify-center">
                   <BrandMark className="size-14" />
                 </div>
                 <CardTitle className="mt-2 text-xl">
-                  {pick("الدخول إلى IConcrete System", "Sign in to IConcrete System")}
+                  {pick("الدخول إلى IConcrete System", "Sign in to IConcrete")}
                 </CardTitle>
                 <CardDescription>
                   {pick(
-                    "أدخل بريد العمل لإنشاء حسابك أو الدخول إلى حسابك — يصل كود التحقق إلى بريدك خلال لحظات.",
-                    "Enter your work email to sign in or create an account — the code arrives in moments.",
+                    "أدخل بريدك ورقم تليفونك - يصل كود التحقق إلى بريدك خلال لحظات",
+                    "Enter your work email to sign in or create an account",
                   )}
                 </CardDescription>
               </CardHeader>
               <form onSubmit={handleEmailSubmit}>
-                <CardContent className="px-6">
-                  <div className="relative flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <Mail className="absolute start-3 top-3 size-4 text-muted-foreground" />
-                      <Input
-                        name="email"
-                        placeholder="name@company.com"
-                        type="email"
-                        className="ps-9"
-                        disabled={isLoading}
-                        required
-                      />
-                      </div>
-<div className="relative flex-1">
-  <Input
-    name="phone"
-    placeholder="رقم تليفون الموظف - 01xxxxxxxxx"
-    type="tel"
-    className="ps-9"
-    disabled={isLoading}
-    required
-  />
-</div>
-                    </div>
-                    <Button
-                      type="submit"
-                      variant="outline"
-                      size="icon"
-                      aria-label={pick("إرسال كود التحقق", "Send verification code")}
+                <CardContent className="px-6 space-y-4">
+                  <div className="relative flex-1">
+                    <Mail className="absolute start-3 top-3 size-4 text-muted-foreground" />
+                    <Input
+                      name="email"
+                      placeholder="name@company.com"
+                      type="email"
+                      className="ps-9"
                       disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <Arrow className="size-4" />
-                      )}
-                    </Button>
+                      required
+                    />
                   </div>
+
+                  <div className="relative flex-1">
+                    <Phone className="absolute start-3 top-3 size-4 text-muted-foreground" />
+                    <Input
+                      name="phone"
+                      placeholder="01xxxxxxxxx - رقم تليفون الموظف"
+                      type="tel"
+                      className="ps-9"
+                      disabled={isLoading}
+                      required
+                    />
+                  </div>
+
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <>
+                        {pick("إرسال كود التحقق", "Send verification code")}
+                        <Arrow className="size-4" />
+                      </>
+                    )}
+                  </Button>
+
                   {error && (
                     <p className="mt-2 text-sm text-destructive">{error}</p>
                   )}
@@ -211,28 +203,25 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                         </span>
                       </div>
                     </div>
-
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="mt-4 w-full"
-                      onClick={handleGuestLogin}
-                      disabled={isLoading}
-                    >
-                      <UserX className="size-4" />
-                      {pick(
-                        "الدخول كزائر (استعراض سريع للمنظومة)",
-                        "Continue as guest (quick tour)",
-                      )}
-                    </Button>
-
-                    <p className="mt-3 text-center text-[11px] leading-5 text-muted-foreground">
-                      {pick(
-                        "الزائر يستعرض المؤشرات ويجرّب الإدخال، دون حذف بيانات أو إدارة أدوار. وأول حساب يُسجَّل بالبريد يصبح «مالك» النظام ويوزّع الصلاحيات على الفريق من شاشة الفريق والصلاحيات.",
-                        "Guests explore the KPIs and try data entry, but cannot delete data or manage roles. The first email account becomes the system owner and can grant team access.",
-                      )}
-                    </p>
                   </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-4 w-full"
+                    onClick={handleGuestLogin}
+                    disabled={isLoading}
+                  >
+                    <UserX className="size-4" />
+                    {pick("الدخول كزائر (استعراض سريع للموقع)", "Continue as guest (quick tour)")}
+                  </Button>
+
+                  <p className="mt-3 text-center text-[11px] leading-5 text-muted-foreground">
+                    {pick(
+                      "الضيوف يستكشفون المؤشرات على الفريق من شاشة الفريق والصلاحيات",
+                      "Guests explore the KPIs and try data entry, but",
+                    )}
+                  </p>
                 </CardContent>
               </form>
             </>
@@ -242,12 +231,10 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                 <div className="flex justify-center">
                   <BrandMark className="size-12" />
                 </div>
-                <CardTitle className="mt-2 text-xl">
-                  {pick("راجع بريدك", "Check your email")}
-                </CardTitle>
+                <CardTitle className="mt-2 text-xl">{pick("راجع بريدك", "Check your email")}</CardTitle>
                 <CardDescription>
                   {pick(
-                    `أرسلنا كودًا مكوّنًا من ٦ أرقام إلى ${step.email}`,
+                    `أرسلنا كودا مكونا من ٦ أرقام إلى ${step.email}`,
                     `We sent a 6-digit code to ${step.email}`,
                   )}
                 </CardDescription>
@@ -256,22 +243,8 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                 <CardContent className="px-6 pb-4">
                   <input type="hidden" name="email" value={step.email} />
                   <input type="hidden" name="code" value={otp} />
-
                   <div className="flex justify-center" dir="ltr">
-                    <InputOTP
-                      value={otp}
-                      onChange={setOtp}
-                      maxLength={6}
-                      disabled={isLoading}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && otp.length === 6 && !isLoading) {
-                          const form = (e.target as HTMLElement).closest("form");
-                          if (form) {
-                            form.requestSubmit();
-                          }
-                        }
-                      }}
-                    >
+                    <InputOTP value={otp} onChange={setOtp} maxLength={6} disabled={isLoading}>
                       <InputOTPGroup>
                         {Array.from({ length: 6 }).map((_, index) => (
                           <InputOTPSlot key={index} index={index} />
@@ -279,33 +252,20 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       </InputOTPGroup>
                     </InputOTP>
                   </div>
-                  {error && (
-                    <p className="mt-2 text-center text-sm text-destructive">
-                      {error}
-                    </p>
-                  )}
+                  {error && <p className="mt-2 text-center text-sm text-destructive">{error}</p>}
                   <p className="mt-4 text-center text-sm text-muted-foreground">
                     {pick("لم يصلك الكود؟", "Didn't get the code?")}{" "}
-                    <Button
-                      variant="link"
-                      type="button"
-                      className="h-auto p-0"
-                      onClick={() => setStep("signIn")}
-                    >
+                    <Button variant="link" type="button" className="h-auto p-0" onClick={() => setStep({ email: "", phone: "" })}>
                       {pick("إعادة المحاولة", "Try again")}
                     </Button>
                   </p>
                 </CardContent>
                 <CardFooter className="flex-col gap-2 px-6">
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={isLoading || otp.length !== 6}
-                  >
+                  <Button type="submit" className="w-full" disabled={isLoading || otp.length !== 6}>
                     {isLoading ? (
                       <>
                         <Loader2 className="size-4 animate-spin" />
-                        {pick("جارٍ التحقق...", "Verifying…")}
+                        {pick("جار التحقق...", "Verifying...")}
                       </>
                     ) : (
                       <>
@@ -314,13 +274,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       </>
                     )}
                   </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setStep("signIn")}
-                    disabled={isLoading}
-                    className="w-full"
-                  >
+                  <Button type="button" variant="ghost" onClick={() => setStep({ email: "", phone: "" })} disabled={isLoading} className="w-full">
                     {pick("استخدام بريد آخر", "Use another email")}
                   </Button>
                 </CardFooter>
@@ -328,14 +282,9 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
             </>
           )}
 
-          <div className="border-t bg-muted px-6 py-4 text-center text-xs text-muted-foreground">
-            {pick("مؤمَّن عبر", "Secured by")}{" "}
-            <a
-              href="https://freebuff.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline transition-colors hover:text-primary"
-            >
+          <div className="border-t bg-muted px-6 py-4 text-center text-xs">
+            {pick("مؤمن بواسطة", "Secured by")}{" "}
+            <a href="https://freebuff.com" target="_blank" rel="noopener noreferrer" className="underline">
               freebuff.com
             </a>
           </div>
