@@ -166,7 +166,7 @@ function ErrorDialog({
             target="_blank"
             rel="noreferrer"
           >
-            <Button className="bg-zinc-100 text-zinc-900 hover:bg-white">
+            <Button className="bg-muted text-foreground hover:bg-accent">
               <ExternalLink className="h-4 w-4" /> Open editor
             </Button>
           </a>

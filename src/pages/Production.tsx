@@ -41,12 +41,7 @@ import { canEditLog } from "@/convex/permissions";
 import { useAccess } from "@/hooks/use-access";
 import { useBranch } from "@/hooks/use-branch";
 import { downloadCsv } from "@/lib/csv";
-import {
-  MIX_NAMES,
-  SHIFT_SHORT_LABELS,
-  STATUS_LABELS,
-  STATUS_ORDER,
-} from "@/lib/concrete";
+import { SHIFT_SHORT_LABELS, STATUS_LABELS, STATUS_ORDER } from "@/lib/concrete";
 import type { LogStatus, Shift } from "@/lib/concrete";
 import { errorMessage as readError } from "@/lib/errors";
 import {
@@ -157,8 +152,11 @@ export default function Production() {
     setSearchParams(next, { replace: true });
   };
 
+  // The filter lists the mixes that actually appear in the ledger. It used to
+  // seed itself with a hard-coded demo grade list, which offered filters for
+  // grades the plant may never pour.
   const mixOptions = useMemo(() => {
-    const found = new Set(MIX_NAMES);
+    const found = new Set<string>();
     for (const row of allRows ?? []) found.add(row.mixDesign);
     return [...found].sort();
   }, [allRows]);

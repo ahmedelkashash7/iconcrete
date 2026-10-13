@@ -16,6 +16,7 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 
+import { useAccess } from "@/hooks/use-access";
 import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/lib/i18n";
 import { ArrowLeft, ArrowRight, Loader2, Mail, UserX, Phone } from "lucide-react";
@@ -38,6 +39,7 @@ function resolveRedirectAfterAuth(
 
 function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const { isLoading: authLoading, isAuthenticated, signIn } = useAuth();
+  const { demoMode } = useAccess();
   const { pick, isRTL } = useI18n();
   const Arrow = isRTL ? ArrowLeft : ArrowRight;
   const navigate = useNavigate();
@@ -205,23 +207,33 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     </div>
                   </div>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="mt-4 w-full"
-                    onClick={handleGuestLogin}
-                    disabled={isLoading}
-                  >
-                    <UserX className="size-4" />
-                    {pick("الدخول كزائر (استعراض سريع للموقع)", "Continue as guest (quick tour)")}
-                  </Button>
+                  {/*
+                   * The guest entry is offered only on a deployment that has
+                   * explicitly enabled DEMO_MODE. On a live plant the button is
+                   * hidden AND the server rejects anonymous viewers
+                   * (see convex/demoMode.ts + convex/access.ts).
+                   */}
+                  {demoMode && (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="mt-4 w-full"
+                        onClick={handleGuestLogin}
+                        disabled={isLoading}
+                      >
+                        <UserX className="size-4" />
+                        {pick("الدخول كزائر (استعراض سريع)", "Continue as guest (quick tour)")}
+                      </Button>
 
-                  <p className="mt-3 text-center text-[11px] leading-5 text-muted-foreground">
-                    {pick(
-                      "الضيوف يستكشفون المؤشرات على الفريق من شاشة الفريق والصلاحيات",
-                      "Guests explore the KPIs and try data entry, but",
-                    )}
-                  </p>
+                      <p className="mt-3 text-center text-[11px] leading-5 text-muted-foreground">
+                        {pick(
+                          "نسخة تجريبية: الزائر يقرأ فقط ولا يمكنه التعديل أو التصدير أو الاطلاع على سجل التتبع.",
+                          "Demo deployment: a guest is read-only and cannot edit, export or read the audit log.",
+                        )}
+                      </p>
+                    </>
+                  )}
                 </CardContent>
               </form>
             </>

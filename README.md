@@ -138,7 +138,10 @@ Variables consumed on the **client** (prefix `VITE_`) and on the **Convex deploy
 | `CONVEX_SITE_URL` | Convex | Yes | Public site URL used by Convex Auth. |
 | `JWT_PRIVATE_KEY` / `JWKS` / `SITE_URL` | Convex | Yes (auth) | Convex Auth signing keys and site URL. |
 | `VLY_CONVEX_AUTH_ISSUER` | Client | No | Auth issuer override (defaults to `https://freebuff.com`). |
-| `ICONCRETE_EXPORT_TOKEN` | Convex | No | Bearer token for the live CSV/JSON export HTTP endpoint; endpoint returns `503` when unset. |
+| `ICONCRETE_EXPORT_TOKEN` | Convex | No | Shared token for the live CSV/JSON export HTTP endpoint. **Header `x-iconcrete-token` only** — a `?token=` query parameter is deliberately refused. Returns `503` when unset. |
+| `ICONCRETE_CORS_ORIGINS` | Convex | No | Comma-separated allow-list of origins for the export endpoint. **Unset means no cross-origin access at all** — there is no wildcard. |
+| `ICONCRETE_EXPORT_BRANCHES` | Convex | No | Comma-separated branch *codes* the export token may read. Unset means every branch. |
+| `DEMO_MODE` | Convex | No | `true` on a throwaway demo deployment only: anonymous visitors become read-only. **Leave unset on a live plant** — with it unset, anonymous access is rejected everywhere and the guest button is hidden. |
 | `KNOCK_API_KEY` | Convex | No | Knock API key for threshold alert notifications. |
 | `KNOCK_ALERT_WORKFLOW` | Convex | No | Knock workflow key used when dispatching alerts. |
 | `KNOCK_API_BASE` | Convex | No | Knock API base URL override. |
@@ -158,7 +161,11 @@ Secrets are managed through the project's Keys/API-keys UI in the hosted environ
 | `bun run build` | `tsc -b && vite build` | Type-check and build for production into `dist/`. |
 | `bun run typecheck` | `tsc -b --noEmit` | Type-check the client project. |
 | `bun run typecheck:convex` | `tsc -p src/convex/tsconfig.json --noEmit` | Type-check the Convex functions. |
-| `bun run lint` | `eslint .` | Lint the project. |
+| `bun run lint` | `eslint .` | Lint the project. Exits non-zero on any error. |
+| `bun run test` | `vitest run` | Unit tests (**57 passing**: the ECP 203 rule engine, V1–V9, exact arithmetic, sampling, and the branch-scope policy). Never put a `.test.ts` under `src/convex/` — that directory is bundled and deployed. |
+| `bun run test:watch` | `vitest` | Unit tests in watch mode. |
+| `bun run check:secrets` | `node scripts/secret-scan.mjs --self-test && node scripts/secret-scan.mjs` | Self-test the scanner's rules, then scan the working tree for committed credentials. Exits non-zero on a finding. |
+| `bun run check:contrast` | `node scripts/contrast-check.mjs` | Measure every design-token pair against its WCAG AA target; exits non-zero on a regression. |
 | `bun run format` | `prettier --write .` | Format the project. |
 | `bun run preview` | `vite preview` | Preview the production build. |
 | `bun run tauri` | `tauri` | Tauri CLI (`bun run tauri build`, `bun run tauri dev`). |

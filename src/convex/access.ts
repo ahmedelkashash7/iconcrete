@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError } from "convex/values";
 import { recordAudit } from "./auditLog";
+import { demoModeEnabled } from "./demoMode";
 import { v } from "convex/values";
 import { internalQuery, mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
@@ -19,17 +20,31 @@ type AnyCtx = QueryCtx | MutationCtx;
 /** A viewer resolved on the server, where the user id is always a real doc id. */
 export type ServerViewer = Viewer & { userId: Id<"users"> };
 
-/** Resolves the signed-in viewer together with their plant role. */
+/**
+ * Resolves the signed-in viewer together with their plant role.
+ *
+ * Anonymous viewers are rejected outright unless the deployment has DEMO_MODE
+ * on (see ./demoMode). This is the single gate every query and mutation passes
+ * through, so "the guest button is hidden" is not the control — this is.
+ */
 export async function requireViewer(ctx: AnyCtx): Promise<ServerViewer> {
   const userId = await getAuthUserId(ctx);
   if (!userId) {
     throw new ConvexError("سجّل الدخول للمتابعة");
   }
   const user = await ctx.db.get(userId);
+  const isAnonymous = user?.isAnonymous === true;
+  const demoMode = demoModeEnabled();
+  if (isAnonymous && !demoMode) {
+    throw new ConvexError(
+      "الوصول كزائر معطّل على هذه النسخة. سجّل الدخول بحسابك للمتابعة.",
+    );
+  }
   return {
     userId,
     role: normalizeRole(user?.role),
-    isAnonymous: user?.isAnonymous === true,
+    isAnonymous,
+    demoMode,
   };
 }
 
@@ -81,6 +96,13 @@ export const ensureProfile = mutation({
 
     let role: PlantRole = "operator";
     if (user.isAnonymous === true) {
+      // Only reachable while DEMO_MODE is on; requireViewer rejects guests
+      // otherwise. Least-privileged role, and `can()` keeps guests read-only.
+      if (!demoModeEnabled()) {
+        throw new ConvexError(
+          "الوصول كزائر معطّل على هذه النسخة. سجّل الدخول بحسابك للمتابعة.",
+        );
+      }
       role = GUEST_ROLE;
     } else {
       const users = await ctx.db.query("users").take(MAX_USERS);
@@ -93,6 +115,16 @@ export const ensureProfile = mutation({
     await ctx.db.patch(userId, { role });
     return role;
   },
+});
+
+/**
+ * Public flag telling the sign-in screen whether to offer the guest button.
+ * It exposes no data — only whether this deployment is a demo — so it is safe
+ * to answer for signed-out visitors.
+ */
+export const demoConfig = query({
+  args: {},
+  handler: async () => ({ demoMode: demoModeEnabled() }),
 });
 
 export const listMembers = query({

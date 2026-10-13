@@ -142,32 +142,31 @@ export const ROLE_CAPABILITIES: Record<PlantRole, Capability[]> = {
 };
 
 /**
- * Capabilities granted to an anonymous sandbox visitor: they may look at
- * everything and try data entry, but never delete records, change roles or
- * manage the plant's people.
+ * Capabilities granted to an anonymous visitor **and only while the deployment
+ * has DEMO_MODE on** (see ./demoMode, default OFF).
+ *
+ * It is deliberately a read-only subset. It excludes `viewFinancials`,
+ * `viewExport`, `viewAudit`, `manageTestData` and every write capability, so a
+ * demo visitor cannot price the plant, download the ledger or read the audit
+ * trail. With DEMO_MODE off an anonymous viewer gets nothing at all.
  */
-export const GUEST_CAPABILITIES: Capability[] = [
-  "viewFinancials",
-  "createLog",
-  "editLog",
-  "manageTestData",
+export const DEMO_GUEST_CAPABILITIES: Capability[] = [
   "viewQuality",
-  "manageQuality",
   "viewInventory",
-  "manageInventory",
   "viewForecast",
   "viewAlerts",
-  "viewExport",
-  "viewAudit",
 ];
 
 export type Viewer = {
   userId: string | null;
   role: PlantRole | null;
   isAnonymous?: boolean;
+  /** Resolved server-side from DEMO_MODE; absent means "off". */
+  demoMode?: boolean;
 };
 
-export const GUEST_ROLE: PlantRole = "manager";
+/** Least-privileged role stored for an anonymous user while DEMO_MODE is on. */
+export const GUEST_ROLE: PlantRole = "operator";
 
 /** Maps stored roles (including the template's legacy ones) onto plant roles. */
 export function normalizeRole(role?: string | null): PlantRole | null {
@@ -194,7 +193,11 @@ export function isPlantRole(value: string): value is PlantRole {
 
 export function can(viewer: Viewer, capability: Capability): boolean {
   if (!viewer.userId || !viewer.role) return false;
-  if (viewer.isAnonymous) return GUEST_CAPABILITIES.includes(capability);
+  if (viewer.isAnonymous) {
+    // DEMO_MODE off (the default) => no capability at all.
+    if (viewer.demoMode !== true) return false;
+    return DEMO_GUEST_CAPABILITIES.includes(capability);
+  }
   return ROLE_CAPABILITIES[viewer.role].includes(capability);
 }
 

@@ -2,7 +2,7 @@ import { api } from "@/convex/_generated/api";
 import { can, normalizeRole, roleLabel } from "@/convex/permissions";
 import type { Capability, Viewer } from "@/convex/permissions";
 import { useAuth } from "@/hooks/use-auth";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 /**
@@ -13,23 +13,28 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 export function useAccess() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const ensureProfile = useMutation(api.access.ensureProfile);
+  /** DEMO_MODE, resolved on the server; `undefined` while it loads. */
+  const demoConfig = useQuery(api.access.demoConfig);
+  const demoMode = demoConfig?.demoMode === true;
   const requested = useRef(false);
 
   useEffect(() => {
     if (!user || user.role || requested.current) return;
+    // Guests have no profile to create unless this is a demo deployment.
+    if (user.isAnonymous === true && !demoMode) return;
     requested.current = true;
     ensureProfile({}).catch((error) => {
       console.error("Role assignment failed:", error);
       requested.current = false;
     });
-  }, [user, ensureProfile]);
+  }, [user, ensureProfile, demoMode]);
 
   const role = normalizeRole(user?.role);
   const isAnonymous = user?.isAnonymous === true;
 
   const viewer: Viewer = useMemo(
-    () => ({ userId: user?._id ?? null, role, isAnonymous }),
-    [user?._id, role, isAnonymous],
+    () => ({ userId: user?._id ?? null, role, isAnonymous, demoMode }),
+    [user?._id, role, isAnonymous, demoMode],
   );
 
   const check = useCallback(
@@ -41,6 +46,8 @@ export function useAccess() {
     viewer,
     role,
     isAnonymous,
+    /** True only on a deployment that explicitly enabled DEMO_MODE. */
+    demoMode,
     label: roleLabel({ role, isAnonymous }),
     /** Role is still being assigned — screens should hold a skeleton. */
     isLoading: isAuthLoading || (!!user && !role),

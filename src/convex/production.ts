@@ -1,6 +1,12 @@
 import { ConvexError, v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { requireCapability, requireViewer } from "./access";
+import {
+  assertBranchUnchanged,
+  mayUseBranch,
+  requireBranchAccess,
+  resolveBranchScope,
+} from "./branchScope";
 import { seedAlertRules } from "./alerts";
 import { diffRecords, recordAudit, snapshotRecord } from "./auditLog";
 import { ensureDefaultBranch } from "./branches";
@@ -171,7 +177,13 @@ export const list = query({
       .order("desc")
       .take(MAX_ROWS);
 
-    const scoped = branchId ? logs.filter((log) => log.branchId === branchId) : logs;
+    // Phase 1.4: reads are limited to the viewer's assigned branches in addition
+    // to the requested filter, so a member cannot read another station's ledger
+    // by changing the filter. Uses the same pure policy as the write gate, so
+    // the unassigned bucket behaves identically on read and write.
+    const scope = await resolveBranchScope(ctx, viewer);
+    const visible = logs.filter((log) => mayUseBranch(scope, log.branchId));
+    const scoped = branchId ? visible.filter((log) => log.branchId === branchId) : visible;
     const rows = scoped.map(enrichLog);
     const financialsVisible = can(viewer, "viewFinancials");
 
@@ -189,6 +201,9 @@ export const create = mutation({
     const priced = await applyStandardPricing(ctx, viewer, fields);
     assertValid(priced);
     const branchId = await resolveBranch(ctx, priced.branchId);
+    // Phase 1.4: a member may only write to a branch assigned to them for the
+    // record's date. The owner and an un-migrated plant are unaffected.
+    await requireBranchAccess(ctx, viewer, branchId, priced.date);
     const record = {
       ...priced,
       branchId,
@@ -235,6 +250,10 @@ export const update = mutation({
     const priced = await applyStandardPricing(ctx, viewer, fields);
     assertValid(priced);
     const branchId = await resolveBranch(ctx, priced.branchId ?? existing.branchId);
+    await requireBranchAccess(ctx, viewer, branchId ?? existing.branchId, priced.date ?? existing.date);
+    // Only an *explicit* branch change is refused; the resolved default for a
+    // legacy row with no branch is not a change.
+    assertBranchUnchanged(existing.branchId, priced.branchId);
     const next = {
       ...priced,
       branchId,
@@ -269,6 +288,7 @@ export const remove = mutation({
     const viewer = await requireCapability(ctx, "deleteLog");
     const existing = await ctx.db.get(id);
     if (!existing) return null;
+    await requireBranchAccess(ctx, viewer, existing.branchId, existing.date);
     await ctx.db.delete(id);
     await recordAudit(ctx, {
       actorId: viewer.userId,

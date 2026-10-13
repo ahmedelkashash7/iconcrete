@@ -26,8 +26,8 @@ const STORAGE_KEY = "iconcrete.lang";
 const DICT: Record<string, { ar: string; en: string }> = {
   "app.name": { ar: "آي كونكريت", en: "IConcrete System" },
   "app.tagline": {
-    ar: "نظام متكامل لمحطات الخرسانة الجاهزة",
-    en: "An integrated ready-mix concrete platform",
+    ar: "منصة لإدارة محطات الخرسانة الجاهزة",
+    en: "A ready-mix concrete plant management platform",
   },
   "nav.section.operations": { ar: "التشغيل اليومي", en: "Daily operations" },
   "nav.section.modules": { ar: "منظومة الوحدات", en: "Module map" },
@@ -48,8 +48,8 @@ const DICT: Record<string, { ar: string; en: string }> = {
   "nav.soon": { ar: "قريبًا", en: "soon" },
   "shell.coverage.title": { ar: "التغطية الحالية", en: "Current coverage" },
   "shell.coverage.body": {
-    ar: "الفروع وأسعار الخلطات والجودة والمخازن والتنبيهات والتنبؤ تعمل فوق نفس سجل الإنتاج، والوحدات القادمة تُبنى عليه دون إدخال مزدوج.",
-    en: "Branches, mix prices, quality, stores, alerts and forecasting all run on the same production ledger — and future modules build on it with no double entry.",
+    ar: "الفروع وأسعار الخلطات والجودة والمخازن والتنبيهات تعمل فوق نفس سجل الإنتاج. الوحدات المعروضة كـ«قريبًا» غير مبنية بعد، ولا تُحتسب ضمن التغطية الحالية.",
+    en: "Branches, mix prices, quality, stores and alerts all run on the same production ledger. Modules shown as “soon” are not built yet and are not counted as current coverage.",
   },
   "shell.user.account": { ar: "حساب المستخدم", en: "User account" },
   "shell.role": { ar: "الدور", en: "Role" },

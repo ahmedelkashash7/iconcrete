@@ -1,11 +1,11 @@
 {
-  "name": "IConcrete System — نظام إدارة محطات الخرسانة الجاهزة",
+  "name": "IConcrete System — منصة إدارة محطات الخرسانة الجاهزة",
   "short_name": "IConcrete System",
-  "description": "نظام متكامل لمحطات الخرسانة الجاهزة: الإنتاج والكميات اليومية، الأرباح والخسائر، التشغيل والمخازن والجودة والأسطول والصيانة.",
+  "description": "منصة لإدارة محطات الخرسانة الجاهزة: تسجيل الإنتاج والجودة والمخازن والأسطول ومتابعة الربحية في مكان واحد.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f7f8fa",
-  "theme_color": "#1d2530",
+  "background_color": "#e9eef2",
+  "theme_color": "#1b2430",
   "icons": [
     {
       "src": "/logo.svg",

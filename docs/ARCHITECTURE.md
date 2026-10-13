@@ -3,6 +3,29 @@
 This document explains how the pieces fit together for maintainers. For setup and
 usage see the [README](../README.md).
 
+> **Hardening v1 (current pass).** Five rules now hold across the codebase, and
+> breaking one of them is a defect:
+>
+> 1. **No invented limits.** A quality result is compared with a limit only when
+>    an approved, engineer-verified, in-force rule supplies it. Otherwise the
+>    badge reads «بدون كود معتمد – مؤشر فقط» and no pass/fail appears
+>    (`src/lib/quality/ecp203.ts`).
+> 2. **No parsing a mix name for compliance.** The cube target is the explicit
+>    `targetCubeMpa`; "C30/37"'s first number is a *cylinder* strength. See the
+>    archived `testTargetValue`/`cubeTargetValue`/`strengthFromName` helpers noted
+>    in `src/lib/concrete.ts`.
+> 3. **No silent price.** `standardPricing` throws `UNKNOWN_MIX` rather than
+>    falling back to another grade (`src/convex/pricing.ts`).
+> 4. **No floating point at a boundary.** Comparisons and share tests go through
+>    `src/lib/exact.ts` (bigint micro-units parsed from decimal text).
+> 5. **No anonymous access.** `DEMO_MODE` is off unless explicitly enabled, and
+>    `requireViewer` rejects an anonymous viewer regardless of the UI
+>    (`src/convex/demoMode.ts`, `access.ts`, `permissions.ts`).
+>
+> Every check that enforces this runs in CI — see `.github/workflows/ci.yml` —
+> and the measured evidence is in `docs/VERIFICATION.md` and `docs/CONTRAST.md`.
+> What is **not** built yet is listed in `docs/KNOWN_LIMITATIONS.md`.
+
 ## 1. High-level shape
 
 ```
@@ -12,6 +35,15 @@ Browser (React 19 + Vite)
 Convex deployment  ──►  queries / mutations  ──►  database (Convex tables)
                    ──►  actions ("use node") ──►  external APIs (Knock, VLY gateway)
                    ──►  http router           ──►  live CSV/JSON export layer
+                          (header-only token, constant-time compare,
+                           CORS allow-list, branch scope, CSV injection guard)
+
+Pure domain libraries (no Convex, no React — unit-tested by `bun run test`)
+  src/lib/exact.ts             exact decimal arithmetic (bigint micro-units)
+  src/lib/quality/ecp203.ts    ECP 203-2007 rule engine + gating + seed rules
+  src/lib/quality/sampling.ts  sampling plan and specimen scheduler
+  src/lib/errors.ts            business error codes + Arabic resolution text
+  src/convex/pricing.ts        approved-mix pricing (throws UNKNOWN_MIX)
 ```
 
 - **Frontend** is a single-page app. Routes are declared in `src/main.tsx`;

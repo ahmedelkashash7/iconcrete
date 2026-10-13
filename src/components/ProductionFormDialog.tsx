@@ -21,9 +21,8 @@ import { Textarea } from "@/components/ui/textarea";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { EnrichedLog } from "@/convex/measures";
 import type { BranchOption } from "@/hooks/use-branch";
+import { api } from "@/convex/_generated/api";
 import {
-  MIX_NAMES,
-  MIX_PRESETS,
   SHIFT_LABELS,
   SHIFT_ORDER,
   STATUS_LABELS,
@@ -43,7 +42,7 @@ import {
 } from "@/lib/format";
 import { isOnline, writeLocalFirst } from "@/lib/offline/syncService";
 import { cn } from "@/lib/utils";
-import { useConvex } from "convex/react";
+import { useConvex, useQuery } from "convex/react";
 import { Loader2, Lock, Save } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent, ReactNode } from "react";
@@ -73,10 +72,14 @@ const toNumber = (value: string) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+/** The plant's approved mix list, as returned by `api.settings.get`. */
+type ApprovedMix = { name: string; price: number; cost: number };
+
 function buildInitialState(
   log: EnrichedLog | null | undefined,
   defaultDate: string,
   defaultBranchId: string,
+  approvedMixes: ApprovedMix[],
 ): FormState {
   if (log) {
     return {
@@ -99,20 +102,24 @@ function buildInitialState(
     };
   }
 
-  const preset = MIX_PRESETS[0];
+  // A blank entry starts on the plant's own approved list. When the list is
+  // empty the price and cost stay blank on purpose: the server refuses an entry
+  // for a mix it cannot price (`UNKNOWN_MIX`), and pre-filling a demo grade would
+  // show the operator a price that does not exist for this plant.
+  const preset = approvedMixes[0];
   return {
     branchId: defaultBranchId,
     date: defaultDate,
     shift: "morning",
-    mixDesign: preset.name,
+    mixDesign: preset?.name ?? "",
     customer: "",
     site: "",
     orderRef: "",
     quantityM3: "",
     deliveredM3: "",
     returnedM3: "0",
-    pricePerM3: String(preset.price),
-    costPerM3: String(preset.cost),
+    pricePerM3: preset ? String(preset.price) : "",
+    costPerM3: preset ? String(preset.cost) : "",
     truckCount: "",
     onTime: true,
     status: "delivered",
@@ -156,8 +163,11 @@ function ProductionForm({
   const access = useAccess();
   const financialsVisible = access.can("viewFinancials");
   const client = useConvex();
+  /** The plant's approved mixes — the only source of price and cost. */
+  const settings = useQuery(api.settings.get);
+  const approvedMixes: ApprovedMix[] = settings?.mixes ?? [];
   const [form, setForm] = useState<FormState>(() =>
-    buildInitialState(log, defaultDate, defaultBranchId),
+    buildInitialState(log, defaultDate, defaultBranchId, approvedMixes),
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -196,14 +206,22 @@ function ProductionForm({
   };
 
   const handleMix = (value: string) => {
-    const preset = MIX_PRESETS.find((mix) => mix.name === value);
+    const preset = approvedMixes.find(
+      (mix) => mix.name.trim().toUpperCase() === value.trim().toUpperCase(),
+    );
     setForm((prev) => ({
       ...prev,
       mixDesign: value,
-      pricePerM3: preset ? String(preset.price) : prev.pricePerM3,
-      costPerM3: preset ? String(preset.cost) : prev.costPerM3,
+      // No silent carry-over of the previous grade's price: a mix that is not on
+      // the approved list clears the figures and is refused on save.
+      pricePerM3: preset ? String(preset.price) : "",
+      costPerM3: preset ? String(preset.cost) : "",
     }));
   };
+
+  const mixIsApproved = approvedMixes.some(
+    (mix) => mix.name.trim().toUpperCase() === form.mixDesign.trim().toUpperCase(),
+  );
 
   const validate = (): string | null => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(form.date)) return "اختر تاريخًا صحيحًا";
@@ -354,10 +372,16 @@ function ProductionForm({
               required
             />
             <datalist id="mix-designs">
-              {MIX_NAMES.map((name) => (
-                <option key={name} value={name} />
+              {approvedMixes.map((mix) => (
+                <option key={mix.name} value={mix.name} />
               ))}
             </datalist>
+            {!mixIsApproved && form.mixDesign.trim().length > 0 && (
+              <p className="text-destructive text-[11px] leading-5">
+                هذه الخلطة ليست على قائمة الأسعار المعتمدة للمحطة — أضفها من
+                إعدادات المحطة أولًا، ولن يُقبل القيد بدون سعر معتمد.
+              </p>
+            )}
           </>
         </FormRow>
 

@@ -4,19 +4,46 @@ import type { Doc } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { requireCapability, requireViewer } from "./access";
+import {
+  assertBranchUnchanged,
+  mayUseBranch,
+  requireBranchAccess,
+  resolveBranchScope,
+} from "./branchScope";
 import { diffRecords, recordAudit, snapshotRecord } from "./auditLog";
 import { defaultBranchId } from "./branches";
 import { DATE_RE, MAX_ROWS, addDays, mulberry32, r2, utcToday } from "./measures";
-import { cubeTargetValue } from "./pricing";
-import { qualityKindValidator } from "./schema";
-import type { QualityKind, QualityResult } from "./schema";
+import {
+  DEMO_SLUMP_TARGET_MM,
+  DEMO_SLUMP_TOLERANCE_MM,
+  cylinderStrengthFromName,
+} from "./pricing";
+import { qualityKindValidator, specimenTypeValidator } from "./schema";
+import type { QualityKind, QualityResult, SpecimenType } from "./schema";
 
 /**
- * Quality control — cube crushing tests and slump tests (ECP 203 / ASTM C94).
+ * Quality control — cube crushing tests at 7/28 days, slump and core tests.
  *
- * The acceptance verdict is computed on the server from the approved strength of
- * the mix, so a test cannot be marked «ناجح» from the interface when its reading
- * is below the characteristic strength.
+ * HARDENING v1 — what changed and why
+ * -----------------------------------
+ * The old version derived the test target from the mix *name*: it took the first
+ * number of "C30/37" (30 MPa, which is the **cylinder** strength) and compared it
+ * with **cube** results, and it accepted a 7-day cube from 70% of the target — a
+ * rule that exists nowhere in the Egyptian code.
+ *
+ * Now:
+ *   - the cube target is `targetCubeMpa`, typed explicitly by the engineer, and
+ *     a cube test without one is refused with `TARGET_STRENGTH_MISSING`;
+ *   - `specimenType` records what was tested; a cylinder is stored and never
+ *     compared against a cube target (owner decision D1);
+ *   - early-age cubes are informational: their `result` stays `pending` and they
+ *     are never marked pass/fail. The 7-day = 70% rule is gone;
+ *   - a slump test needs its own specified value and tolerance — neither is
+ *     invented. The authoritative tolerance comes from an approved rule; until
+ *     one exists the row is stored as `pending` and labelled indicator-only.
+ *
+ * Full code-based judging (R-PRE/R-FIN/R-SLUMP/R-CORE) lives in
+ * `src/lib/quality/ecp203.ts`; this module stores the result and the verdict.
  */
 
 const QUALITY_FIELDS = [
@@ -32,12 +59,15 @@ const QUALITY_FIELDS = [
   "tolerance",
   "actualValue",
   "result",
+  "targetCubeMpa",
+  "specimenType",
+  "complianceStatus",
+  "complianceDetail",
+  "complianceRuleKey",
+  "ticketNo",
   "testedBy",
   "notes",
 ] as const;
-
-export const DEFAULT_SLUMP_TARGET_MM = 120;
-export const DEFAULT_SLUMP_TOLERANCE_MM = 25;
 
 type TestRow = Doc<"qualityTests">;
 
@@ -45,17 +75,30 @@ function clean(text?: string) {
   return text?.trim() || undefined;
 }
 
-/** Acceptance rule: a cube must reach its target, a slump must stay in band. */
+/** Error code mirrored in `src/lib/errors.ts` → BUSINESS_ERRORS.TARGET_STRENGTH_MISSING. */
+export const TARGET_STRENGTH_MISSING_CODE = "TARGET_STRENGTH_MISSING";
+
+/**
+ * Interim acceptance flag for the legacy `result` field.
+ *
+ * Cubes are judged only against the explicit `targetCubeMpa`. Early-age cubes
+ * and cylinders never get a verdict (always `pending`). A slump is `pending`
+ * unless an explicit tolerance is supplied — the app invents no tolerance, and
+ * the authoritative value is an approved R-SLUMP parameter.
+ */
 export function evaluateQuality(
   kind: QualityKind,
   targetValue: number,
   tolerance: number | undefined,
   actualValue: number,
+  specimenType: SpecimenType = "cube",
 ): QualityResult {
   if (!Number.isFinite(actualValue) || actualValue <= 0) return "pending";
+  if (kind === "cube7" || kind === "cube3" as QualityKind) return "pending";
+  if (kind !== "slump" && specimenType === "cylinder") return "pending";
   if (kind === "slump") {
-    const band = tolerance && tolerance > 0 ? tolerance : DEFAULT_SLUMP_TOLERANCE_MM;
-    return Math.abs(actualValue - targetValue) <= band ? "pass" : "fail";
+    if (tolerance === undefined || tolerance <= 0) return "pending";
+    return Math.abs(actualValue - targetValue) <= tolerance ? "pass" : "fail";
   }
   return actualValue >= targetValue ? "pass" : "fail";
 }
@@ -70,7 +113,11 @@ const testFields = {
   sampleRef: v.optional(v.string()),
   labName: v.optional(v.string()),
   targetValue: v.optional(v.number()),
+  /** Explicit cube target in MPa, typed by the engineer. */
+  targetCubeMpa: v.optional(v.number()),
+  specimenType: v.optional(specimenTypeValidator),
   tolerance: v.optional(v.number()),
+  ticketNo: v.optional(v.string()),
   actualValue: v.number(),
   testedBy: v.optional(v.string()),
   notes: v.optional(v.string()),
@@ -86,17 +133,45 @@ type TestInput = {
   sampleRef?: string;
   labName?: string;
   targetValue?: number;
+  targetCubeMpa?: number;
+  specimenType?: SpecimenType;
   tolerance?: number;
+  ticketNo?: string;
   actualValue: number;
   testedBy?: string;
   notes?: string;
 };
 
-/** Fills the target from the approved mix list when the form leaves it blank. */
-function resolveTarget(input: TestInput) {
-  if (input.targetValue && input.targetValue > 0) return input.targetValue;
-  if (input.kind === "slump") return DEFAULT_SLUMP_TARGET_MM;
-  return cubeTargetValue(input.mixDesign, input.kind === "cube7" ? "cube7" : "cube28");
+/**
+ * The target a test is compared against, or a hard error.
+ *
+ * Nothing is derived from the mix name and no default is substituted: an
+ * explicit target is required for cubes (and an explicit specified slump for a
+ * slump), because a silently invented target is how the old code compared
+ * cylinder strengths with cube results.
+ */
+function resolveTarget(input: TestInput): number {
+  const explicit = input.targetValue && input.targetValue > 0 ? input.targetValue : undefined;
+  if (input.kind === "slump") {
+    if (explicit) return explicit;
+    throw new ConvexError({
+      code: "VALIDATION_FAILED",
+      title: "الركود المحدد مطلوب",
+      message:
+        "أدخل قيمة الركود المحددة للمشروع (مم) — النظام لا يفترض قيمة من عنده لأن السماحية تُقاس بالنسبة إليها.",
+      retryable: false,
+    });
+  }
+  const cubeTarget = input.targetCubeMpa && input.targetCubeMpa > 0 ? input.targetCubeMpa : undefined;
+  if (cubeTarget) return cubeTarget;
+  if (explicit) return explicit;
+  throw new ConvexError({
+    code: TARGET_STRENGTH_MISSING_CODE,
+    title: "مقاومة المكعب المطلوبة غير محددة",
+    message:
+      "لا يمكن تقييم نتيجة مقاومة بدون مقاومة مكعب مطلوبة مكتوبة صراحةً. أدخل «مقاومة المكعب المطلوبة» (targetCubeMpa) — لا يُقرأ الهدف من اسم الخلطة لأن الرقم الأول فيه مقاومة أسطوانة.",
+    retryable: false,
+  });
 }
 
 function buildRecord(input: TestInput, branchId: Id<"branches"> | undefined) {
@@ -110,6 +185,9 @@ function buildRecord(input: TestInput, branchId: Id<"branches"> | undefined) {
   }
 
   const targetValue = resolveTarget(input);
+  // Owner decision D1: cubes are the compliance basis. Legacy rows have no
+  // specimenType and are treated as cubes, matching what the plant always tested.
+  const specimenType: SpecimenType = input.specimenType ?? "cube";
   return {
     branchId,
     date: input.date,
@@ -121,16 +199,23 @@ function buildRecord(input: TestInput, branchId: Id<"branches"> | undefined) {
     sampleRef: clean(input.sampleRef),
     labName: clean(input.labName),
     targetValue: r2(targetValue),
+    // Stored explicitly so the target shown beside a result is the target the
+    // result was judged against, and so a later change to a mix design cannot
+    // silently rewrite the history of an old test.
+    targetCubeMpa: input.kind === "slump" ? undefined : r2(targetValue),
+    specimenType,
     tolerance:
-      input.kind === "slump"
-        ? r2(
-            input.tolerance && input.tolerance > 0
-              ? input.tolerance
-              : DEFAULT_SLUMP_TOLERANCE_MM,
-          )
+      input.kind === "slump" && input.tolerance && input.tolerance > 0
+        ? r2(input.tolerance)
         : undefined,
     actualValue: r2(input.actualValue),
-    result: evaluateQuality(input.kind, targetValue, input.tolerance, input.actualValue),
+    result: evaluateQuality(input.kind, targetValue, input.tolerance, input.actualValue, specimenType),
+    // The verdict is computed by the rule engine (`src/lib/quality/ecp203.ts`)
+    // and defaults to indicator-only: no rule is approved out of the box, and
+    // the system never guesses a verdict it cannot point at a clause for.
+    complianceStatus: "indicator_only",
+    complianceRuleKey: undefined,
+    ticketNo: clean(input.ticketNo),
     testedBy: clean(input.testedBy),
     notes: clean(input.notes),
   };
@@ -141,6 +226,8 @@ export const create = mutation({
   handler: async (ctx, { branchId, ...input }) => {
     const viewer = await requireCapability(ctx, "manageQuality");
     const resolvedBranch = branchId ?? (await defaultBranchId(ctx));
+    // Phase 1.4: only a branch assigned to the viewer may be written to.
+    await requireBranchAccess(ctx, viewer, resolvedBranch, input.date);
     const record = {
       ...buildRecord(input, resolvedBranch),
       isTestData: false,
@@ -167,6 +254,9 @@ export const update = mutation({
     if (!existing) throw new ConvexError("الاختبار لم يعد موجودًا");
 
     const resolvedBranch = branchId ?? existing.branchId;
+    await requireBranchAccess(ctx, viewer, resolvedBranch ?? existing.branchId, input.date ?? existing.date);
+    // Only an explicit branch change is refused.
+    assertBranchUnchanged(existing.branchId, branchId);
     const next = buildRecord(input, resolvedBranch);
     await ctx.db.patch(id, next);
     await recordAudit(ctx, {
@@ -187,6 +277,7 @@ export const remove = mutation({
     const viewer = await requireCapability(ctx, "manageQuality");
     const existing = await ctx.db.get(id);
     if (!existing) return null;
+    await requireBranchAccess(ctx, viewer, existing.branchId, existing.date);
     await ctx.db.delete(id);
     await recordAudit(ctx, {
       actorId: viewer.userId,
@@ -273,7 +364,7 @@ export const overview = query({
     branchId: v.optional(v.id("branches")),
   },
   handler: async (ctx, { days: requestedDays, today: requestedToday, branchId }) => {
-    await requireViewer(ctx);
+    const viewer = await requireViewer(ctx);
     const days = Math.min(Math.max(Math.round(requestedDays || 90), 7), 365);
     const today =
       requestedToday && DATE_RE.test(requestedToday) ? requestedToday : utcToday();
@@ -285,7 +376,11 @@ export const overview = query({
       .order("desc")
       .take(MAX_ROWS);
 
-    const rows = branchId ? all.filter((row) => row.branchId === branchId) : all;
+    // Phase 1.4: the viewer's assigned branches bound the read as well as the
+    // requested filter, using the same pure policy as the write gate.
+    const scope = await resolveBranchScope(ctx, viewer);
+    const visible = all.filter((row) => mayUseBranch(scope, row.branchId));
+    const rows = branchId ? visible.filter((row) => row.branchId === branchId) : visible;
 
     const cubes28 = rows.filter((row) => row.kind === "cube28");
     const cubes7 = rows.filter((row) => row.kind === "cube7");
@@ -294,11 +389,18 @@ export const overview = query({
     const cubeTally = tally([...cubes7, ...cubes28]);
     const slumpTally = tally(slumps);
 
+    // "In band" is only counted when the row actually carries a tolerance.
+    // The old code substituted an invented 25 mm default here, which reported a
+    // pass for rows that had never been compared with anything.
     const inBand = slumps.filter(
       (row) =>
         row.result === "pass" ||
-        Math.abs(row.actualValue - row.targetValue) <=
-          (row.tolerance ?? DEFAULT_SLUMP_TOLERANCE_MM),
+        (typeof row.tolerance === "number" &&
+          row.tolerance > 0 &&
+          Math.abs(row.actualValue - row.targetValue) <= row.tolerance),
+    ).length;
+    const slumpsWithoutTolerance = slumps.filter(
+      (row) => typeof row.tolerance !== "number" || row.tolerance <= 0,
     ).length;
 
     const trendMap = new Map<string, { actual: number; target: number; count: number }>();
@@ -341,6 +443,13 @@ export const overview = query({
           slumpTally.passed + slumpTally.failed > 0
             ? r2((slumpTally.passed / (slumpTally.passed + slumpTally.failed)) * 100)
             : 0,
+        /**
+         * Slump rows with no tolerance on the record. They were counted as "in
+         * band" by the old code because it substituted an invented 25 mm value;
+         * they are now excluded and reported so the gap is visible.
+         */
+        slumpsWithoutTolerance,
+        slumpsInBand: inBand,
       },
       cubes: {
         ...cubeTally,
@@ -415,15 +524,15 @@ export async function seedQualityTests(
       let labName = "معمل المحطة";
       let notes: string | undefined;
 
+      // DEMO SEED ONLY — the rows written here are flagged isTestData and are
+      // generated from demo constants, never from the plant's live rules.
       if (step.kind === "slump") {
-        targetValue = DEFAULT_SLUMP_TARGET_MM;
-        tolerance = DEFAULT_SLUMP_TOLERANCE_MM;
+        targetValue = DEMO_SLUMP_TARGET_MM;
+        tolerance = DEMO_SLUMP_TOLERANCE_MM;
         actualValue = Math.round(targetValue + (roll - 0.5) * 52);
       } else {
-        targetValue = cubeTargetValue(
-          source.mixDesign,
-          step.kind === "cube7" ? "cube7" : "cube28",
-        );
+        targetValue =
+          cylinderStrengthFromName(source.mixDesign) ?? DEMO_SLUMP_TARGET_MM;
         const factor =
           step.kind === "cube7" ? 1.1 + (roll - 0.5) * 0.26 : 1.07 + (roll - 0.5) * 0.18;
         actualValue = Math.round(targetValue * factor * 2) / 2;

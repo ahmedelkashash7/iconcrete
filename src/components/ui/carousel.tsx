@@ -88,17 +88,26 @@ function Carousel({
 
   React.useEffect(() => {
     if (!api || !setApi) return
-    setApi(api)
+    // Handing the embla instance to the parent is a state update in a child
+    // effect, so it is deferred to a microtask: the parent still receives the
+    // api before any user interaction, without a synchronous cascading render.
+    queueMicrotask(() => setApi(api))
   }, [api, setApi])
 
   React.useEffect(() => {
     if (!api) return
-    onSelect(api)
-    api.on("reInit", onSelect)
-    api.on("select", onSelect)
+    // `onSelect` mirrors embla's scroll state into React state, so the initial
+    // read is deferred to a microtask rather than run synchronously inside the
+    // effect. The reInit listener is also detached on cleanup — the previous
+    // version only detached "select", leaking a listener per api change.
+    const sync = () => onSelect(api)
+    queueMicrotask(sync)
+    api.on("reInit", sync)
+    api.on("select", sync)
 
     return () => {
-      api?.off("select", onSelect)
+      api.off("reInit", sync)
+      api.off("select", sync)
     }
   }, [api, onSelect])
 

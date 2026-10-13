@@ -3,6 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { requireCapability, requireViewer } from "./access";
+import { mayUseBranch, requireBranchAccess, resolveBranchScope } from "./branchScope";
 import { diffRecords, recordAudit, snapshotRecord } from "./auditLog";
 import { defaultBranchId } from "./branches";
 import { DATE_RE, MAX_ROWS, addDays, mulberry32, r2, utcToday } from "./measures";
@@ -74,6 +75,8 @@ export const createMaterial = mutation({
   args: { branchId: v.optional(v.id("branches")), ...materialFields },
   handler: async (ctx, { branchId, ...fields }) => {
     const viewer = await requireCapability(ctx, "manageInventory");
+    // Phase 1.4: a material may only be created on an assigned branch.
+    await requireBranchAccess(ctx, viewer, branchId);
     if (!fields.name.trim()) throw new ConvexError("اسم المادة مطلوب");
     assertMoney(fields.openingQty, "الرصيد الافتتاحي");
     assertMoney(fields.reorderLevel, "حد إعادة الطلب");
@@ -218,6 +221,8 @@ export const recordMovement = mutation({
     if (fields.unitCost !== undefined) {
       assertMoney(fields.unitCost, "تكلفة الوحدة");
     }
+    // Phase 1.4: only a branch assigned to the viewer may receive a movement.
+    await requireBranchAccess(ctx, viewer, branchId ?? material.branchId, fields.date);
 
     const record = {
       branchId: branchId ?? material.branchId ?? (await defaultBranchId(ctx)),
@@ -251,6 +256,7 @@ export const removeMovement = mutation({
     const viewer = await requireCapability(ctx, "manageInventory");
     const existing = await ctx.db.get(id);
     if (!existing) return null;
+    await requireBranchAccess(ctx, viewer, existing.branchId, existing.date);
     await ctx.db.delete(id);
     await recordAudit(ctx, {
       actorId: viewer.userId,
@@ -293,12 +299,19 @@ export const overview = query({
       requestedToday && DATE_RE.test(requestedToday) ? requestedToday : utcToday();
     const start = addDays(today, -(days - 1));
 
-    const allMaterials = await ctx.db.query("materials").take(MATERIALS_MAX);
+    // Phase 1.4: the viewer's assigned branches bound the read as well as the
+    // requested filter, using the same pure policy as the write gate.
+    const scope = await resolveBranchScope(ctx, viewer, today);
+    const allMaterials = (await ctx.db.query("materials").take(MATERIALS_MAX)).filter(
+      (row) => mayUseBranch(scope, row.branchId),
+    );
     const materials = allMaterials.filter(
       (row) => !branchId || !row.branchId || row.branchId === branchId,
     );
 
     const allMovements = (await ctx.db.query("materialMovements").take(MAX_ROWS)).filter(
+      (row) => mayUseBranch(scope, row.branchId),
+    ).filter(
       (row) => !branchId || !row.branchId || row.branchId === branchId,
     );
 

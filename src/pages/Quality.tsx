@@ -46,14 +46,11 @@ import { useAccess } from "@/hooks/use-access";
 import { useBranch } from "@/hooks/use-branch";
 import { downloadCsv } from "@/lib/csv";
 import {
-  DEFAULT_SLUMP_TOLERANCE_MM,
   QUALITY_KIND_LABELS,
   QUALITY_KIND_ORDER,
   QUALITY_KIND_SHORT,
   QUALITY_RESULT_LABELS,
   QUALITY_UNITS,
-  evaluateQualityPreview,
-  testTargetValue,
 } from "@/lib/concrete";
 import type { QualityKind, QualityResult } from "@/lib/concrete";
 import { errorMessage as readError } from "@/lib/errors";
@@ -161,7 +158,9 @@ function TestDialog({
           sampleRef: test.sampleRef ?? "",
           labName: test.labName ?? "",
           targetValue: String(test.targetValue),
-          tolerance: String(test.tolerance ?? DEFAULT_SLUMP_TOLERANCE_MM),
+          // Blank when the row carries no tolerance: the old version filled in an
+          // invented 25 mm, which then looked like a real limit.
+          tolerance: test.tolerance === undefined ? "" : String(test.tolerance),
           actualValue: String(test.actualValue),
           testedBy: test.testedBy ?? "",
           notes: test.notes ?? "",
@@ -176,7 +175,7 @@ function TestDialog({
           sampleRef: "",
           labName: "معمل المحطة",
           targetValue: "",
-          tolerance: String(DEFAULT_SLUMP_TOLERANCE_MM),
+          tolerance: "",
           actualValue: "",
           testedBy: "",
           notes: "",
@@ -186,13 +185,29 @@ function TestDialog({
   const set = <K extends keyof TestForm>(key: K, value: TestForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  const target =
-    form.targetValue && Number(form.targetValue) > 0
-      ? Number(form.targetValue)
-      : testTargetValue(form.kind, form.mixDesign);
-  const tolerance = Number(form.tolerance) || DEFAULT_SLUMP_TOLERANCE_MM;
+  // Nothing is derived from the mix name and nothing is defaulted:
+  //   - a cube target comes from the «مقاومة المكعب المطلوبة» field only;
+  //   - a slump tolerance is used only when the operator supplied one.
+  const target = Number(form.targetValue) > 0 ? Number(form.targetValue) : 0;
+  const tolerance = Number(form.tolerance) > 0 ? Number(form.tolerance) : 0;
   const actual = Number(form.actualValue) || 0;
-  const preview = evaluateQualityPreview(form.kind, target, tolerance, actual);
+  /**
+   * Client-side preview only. It mirrors the *storage* rule so the operator sees
+   * an obvious slip before saving; it is deliberately not a code verdict.
+   * Code judgements (R-PRE/R-FIN/R-SLUMP/R-CORE) require an approved, verified and
+   * in-force rule, and are computed by `@/lib/quality/ecp203` against the rule
+   * stored on the server. An early-age cube and a cylinder never get a verdict.
+   */
+  const preview: QualityResult = (() => {
+    if (!Number.isFinite(actual) || actual <= 0) return "pending";
+    if (form.kind === "cube7") return "pending";
+    if (form.kind === "slump") {
+      if (tolerance <= 0) return "pending";
+      return Math.abs(actual - target) <= tolerance ? "pass" : "fail";
+    }
+    if (target <= 0) return "pending";
+    return actual >= target ? "pass" : "fail";
+  })();
   const unit = QUALITY_UNITS[form.kind];
 
   const submit = async () => {
@@ -209,7 +224,11 @@ function TestDialog({
         sampleRef: form.sampleRef.trim() || undefined,
         labName: form.labName.trim() || undefined,
         targetValue: form.targetValue ? Number(form.targetValue) : undefined,
-        tolerance: form.kind === "slump" ? tolerance : undefined,
+        // Explicit cube target: the compliance basis (owner decision D1). The
+        // specimen-type selector and ticket number are wired in the rule-entry
+        // screen work (see REQUIREMENTS.md 2.1 / 2.7).
+        targetCubeMpa: form.kind === "slump" ? undefined : target || undefined,
+        tolerance: form.kind === "slump" && tolerance > 0 ? tolerance : undefined,
         actualValue: actual,
         testedBy: form.testedBy.trim() || undefined,
         notes: form.notes.trim() || undefined,

@@ -79,6 +79,16 @@ export const qualityResultValidator = v.union(
 );
 export type QualityResult = Infer<typeof qualityResultValidator>;
 
+/**
+ * Compliance is judged on cubes only (owner decision D1). A cylinder row is
+ * stored for reference and is never compared with a cube target.
+ */
+export const specimenTypeValidator = v.union(
+  v.literal("cube"),
+  v.literal("cylinder"),
+);
+export type SpecimenType = Infer<typeof specimenTypeValidator>;
+
 /* ---------------------------- Inventory --------------------------- */
 
 export const materialCategoryValidator = v.union(
@@ -281,13 +291,21 @@ const schema = defineSchema(
     })
       .index("by_date", ["date"])
       .index("by_customer", ["customer"])
-      .index("by_branch", ["branchId"]),
-
-    /**
-     * Quality control: cube crushing tests at 7/28 days and slump tests.
-     * `targetValue` comes from the approved mix list (fck) and `result` is what
-     * the compliance report and the ISO 9001 records are built from.
-     */
+      .index("by_branch", ["branchId"]),/**
+ * Quality control: cube crushing tests at 7/28 days and slump tests.
+ *
+ * Compliance basis (owner decision D1): **cubes**. `targetCubeMpa` is the
+ * characteristic cube strength typed by the engineer — it is never read out of
+ * the mix name, because "C30/37"'s first number is the *cylinder* strength.
+ * `specimenType` records what was actually tested; a `cylinder` row is stored
+ * for reference and is never compared against a cube target.
+ *
+ * `result` is the legacy pass/fail/pending flag kept for existing rows and
+ * screens. `complianceStatus` holds the rule-engine verdict
+ * (meets | does_not_meet | refer_to_consultant | indicator_only |
+ * insufficient_data) and `complianceRuleKey` names the approved rule that
+ * produced it, so a verdict can always be traced to a clause.
+ */
     qualityTests: defineTable({
       branchId: v.optional(v.id("branches")),
       date: v.string(),
@@ -305,6 +323,16 @@ const schema = defineSchema(
       tolerance: v.optional(v.number()),
       actualValue: v.number(),
       result: qualityResultValidator,
+      /** Explicit cube target typed by the engineer (never parsed from a name). */
+      targetCubeMpa: v.optional(v.number()),
+      /** What was tested. Absent on legacy rows => treated as a cube. */
+      specimenType: v.optional(specimenTypeValidator),
+      /** Rule-engine verdict; see src/lib/quality/ecp203.ts. */
+      complianceStatus: v.optional(v.string()),
+      complianceDetail: v.optional(v.string()),
+      complianceRuleKey: v.optional(v.string()),
+      /** Ticket / load number for traceability (phase 2.7). */
+      ticketNo: v.optional(v.string()),
       testedBy: v.optional(v.string()),
       notes: v.optional(v.string()),
       isTestData: v.boolean(),
@@ -312,6 +340,63 @@ const schema = defineSchema(
     })
       .index("by_date", ["date"])
       .index("by_mix", ["mixDesign"])
+      .index("by_branch", ["branchId"]),
+
+    /**
+     * Approved quality rules (phase 2.2). A result is judged only against a row
+     * here that is approved, verified by the engineer, effective on the test
+     * date and has every parameter present and individually verified.
+     *
+     * `params` is deliberately `v.any()`: the rule shapes differ per clause
+     * (a percentage pair for R-PRE, a count + percentage for R-FIN, a nullable
+     * tolerance for R-SLUMP…). The typed, validated view of the same data lives
+     * in `src/lib/quality/ecp203.ts`, and `src/lib/quality/rules.test.ts`
+     * checks that the stored shape round-trips.
+     */
+    qualityRules: defineTable({
+      ruleKey: v.string(),
+      testType: v.string(),
+      ageDays: v.optional(v.number()),
+      unit: v.string(),
+      criteriaKind: v.string(),
+      params: v.any(),
+      standardReference: v.string(),
+      ocrConfidence: v.string(),
+      verifiedByEngineer: v.boolean(),
+      enteredBy: v.optional(v.id("users")),
+      approvedBy: v.optional(v.id("users")),
+      approvalStatus: v.union(
+        v.literal("draft"),
+        v.literal("approved"),
+        v.literal("retired"),
+      ),
+      effectiveFrom: v.string(),
+      effectiveTo: v.optional(v.string()),
+      version: v.number(),
+      notes: v.optional(v.string()),
+      branchId: v.optional(v.id("branches")),
+      isTestData: v.optional(v.boolean()),
+    })
+      .index("by_ruleKey", ["ruleKey"])
+      .index("by_testType", ["testType"]),
+
+    /**
+     * Per-member branch assignment with effective dates (phase 1.4). Branch was
+     * only a UI filter; this table is what the server enforces. A record's
+     * branch is immutable once created, and a member may only touch the branches
+     * assigned here for the date in question.
+     */
+    userBranches: defineTable({
+      userId: v.id("users"),
+      branchId: v.id("branches"),
+      /** ISO day from which the assignment is in force. */
+      effectiveFrom: v.string(),
+      /** ISO day after which it no longer applies. Absent = open ended. */
+      effectiveTo: v.optional(v.string()),
+      assignedBy: v.optional(v.id("users")),
+      createdAt: v.number(),
+    })
+      .index("by_user", ["userId"])
       .index("by_branch", ["branchId"]),
 
     /** Material master data: cement, aggregates, sand, admixtures… */

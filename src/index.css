@@ -45,80 +45,98 @@
 /* CHANGE VALUES FOR THEME */
 :root {
   --radius: 0.75rem;
-  /* quiet neutrals: near-white canvas, crisp white surfaces, graphite ink */
-  --background: oklch(0.978 0.003 252);
-  --foreground: oklch(0.215 0.016 256);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.215 0.016 256);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.215 0.016 256);
-  --primary: oklch(0.3 0.036 256);
-  --primary-foreground: oklch(0.985 0.002 250);
-  --secondary: oklch(0.964 0.004 250);
-  --secondary-foreground: oklch(0.315 0.02 256);
-  --muted: oklch(0.966 0.004 250);
-  --muted-foreground: oklch(0.529 0.014 256);
-  --accent: oklch(0.958 0.006 250);
-  --accent-foreground: oklch(0.28 0.02 256);
-  --destructive: oklch(0.577 0.188 25);
-  --border: oklch(0.912 0.006 256);
-  --input: oklch(0.9 0.006 256);
-  --ring: oklch(0.62 0.04 256);
+  /*
+   * Cool blue-grey professional palette (hardening v1).
+   * Canvas  #E9EEF2 · surfaces #F7F9FB · ink #1B2430 — see docs/CONTRAST.md
+   * for the measured WCAG AA ratios of every foreground/background pair below.
+   */
+  --background: #e9eef2;
+  --foreground: #1b2430;
+  --card: #f7f9fb;
+  --card-foreground: #1b2430;
+  --popover: #f7f9fb;
+  --popover-foreground: #1b2430;
+  --primary: #24303f;
+  --primary-foreground: #f7f9fb;
+  --secondary: #eef2f6;
+  --secondary-foreground: #1b2430;
+  --muted: #eef2f6;
+  --muted-foreground: #55606e;
+  --accent: #edf1f5;
+  --accent-foreground: #1b2430;
+  --destructive: oklch(0.54 0.19 25);
+  /* --border is a decorative hairline divider (WCAG 1.4.11 exempt); the
+     boundary that must reach 3:1 is --input, and the focus indicator --ring. */
+  --border: #d5dde5;
+  --input: #737f8c;
+  --ring: #6b7684;
   /* data colours: revenue / production / cost / loss / margin */
   --chart-1: oklch(0.552 0.121 256);
   --chart-2: oklch(0.632 0.115 176);
-  --chart-3: oklch(0.716 0.14 66);
+  --chart-3: oklch(0.6 0.13 66);
   --chart-4: oklch(0.596 0.168 22);
   --chart-5: oklch(0.573 0.112 300);
-  --sidebar: oklch(0.993 0.002 250);
-  --sidebar-foreground: oklch(0.215 0.016 256);
-  --sidebar-primary: oklch(0.315 0.033 256);
-  --sidebar-primary-foreground: oklch(0.985 0.002 250);
-  --sidebar-accent: oklch(0.958 0.006 250);
-  --sidebar-accent-foreground: oklch(0.28 0.02 256);
-  --sidebar-border: oklch(0.925 0.005 256);
-  --sidebar-ring: oklch(0.62 0.04 256);
-  /* brand + semantic accents */
-  --brand: oklch(0.723 0.152 62);
+  --sidebar: #f2f5f8;
+  --sidebar-foreground: #1b2430;
+  --sidebar-primary: #24303f;
+  --sidebar-primary-foreground: #f7f9fb;
+  --sidebar-accent: #edf1f5;
+  --sidebar-accent-foreground: #1b2430;
+  --sidebar-border: #dde4ea;
+  --sidebar-ring: #6b7684;
+  /*
+   * Brand + semantic accents. Each is dark enough to be used as *text* on the
+   * canvas, on a card and on its own 10–20% tint (small badges), so no screen
+   * has to opt out of the token to stay readable. Measured in
+   * docs/CONTRAST.md — re-run `node scripts/contrast-check.mjs` after any edit.
+   */
+  --brand: #975200;
   --brand-foreground: oklch(0.24 0.045 62);
-  --success: oklch(0.616 0.138 158);
-  --success-foreground: oklch(0.99 0.01 158);
-  --warning: oklch(0.782 0.142 78);
+  --success: #007845;
+  --success-foreground: #ffffff;
+  --warning: oklch(0.48 0.115 72);
   --warning-foreground: oklch(0.3 0.06 78);
 }
 
 .dark {
-  --background: oklch(0.185 0.011 256);
-  --foreground: oklch(0.962 0.003 250);
-  --card: oklch(0.228 0.012 256);
-  --card-foreground: oklch(0.962 0.003 250);
-  --popover: oklch(0.228 0.012 256);
-  --popover-foreground: oklch(0.962 0.003 250);
+  /* cool-graphite dark counterpart of the light palette above */
+  --background: #121821;
+  --foreground: #e8edf2;
+  --card: #1a222c;
+  --card-foreground: #e8edf2;
+  --popover: #1a222c;
+  --popover-foreground: #e8edf2;
   --primary: oklch(0.925 0.005 250);
   --primary-foreground: oklch(0.235 0.015 256);
-  --secondary: oklch(0.275 0.012 256);
-  --secondary-foreground: oklch(0.962 0.003 250);
-  --muted: oklch(0.275 0.012 256);
-  --muted-foreground: oklch(0.712 0.012 252);
-  --accent: oklch(0.295 0.014 256);
-  --accent-foreground: oklch(0.962 0.003 250);
-  --destructive: oklch(0.669 0.17 22);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --secondary: #232c37;
+  --secondary-foreground: #e8edf2;
+  --muted: #232c37;
+  --muted-foreground: #a3b0bd;
+  --accent: #262f3b;
+  --accent-foreground: #e8edf2;
+  /*
+   * Light red so `text-destructive` stays readable on the dark card; the
+   * destructive button reaches its ratio through the `dark:bg-destructive/60`
+   * overlay in ui/button.tsx and ui/badge.tsx (measured in docs/CONTRAST.md).
+   */
+  --destructive: oklch(0.68 0.17 25);
+  /* decorative divider; --input/--ring carry the 3:1 contrast requirement */
+  --border: #3a4553;
+  --input: #6b7684;
+  --ring: #8b98a8;
   --chart-1: oklch(0.66 0.13 258);
   --chart-2: oklch(0.7 0.12 176);
   --chart-3: oklch(0.78 0.14 66);
   --chart-4: oklch(0.68 0.15 22);
   --chart-5: oklch(0.68 0.12 300);
-  --sidebar: oklch(0.212 0.012 256);
-  --sidebar-foreground: oklch(0.962 0.003 250);
-  --sidebar-primary: oklch(0.66 0.13 258);
-  --sidebar-primary-foreground: oklch(0.962 0.003 250);
-  --sidebar-accent: oklch(0.295 0.014 256);
-  --sidebar-accent-foreground: oklch(0.962 0.003 250);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar: #161d26;
+  --sidebar-foreground: #e8edf2;
+  --sidebar-primary: #6b9bd8;
+  --sidebar-primary-foreground: #10161d;
+  --sidebar-accent: #262f3b;
+  --sidebar-accent-foreground: #e8edf2;
+  --sidebar-border: #3a4553;
+  --sidebar-ring: #8b98a8;
   --brand: oklch(0.76 0.145 66);
   --brand-foreground: oklch(0.24 0.045 62);
   --success: oklch(0.68 0.13 158);
@@ -165,9 +183,9 @@
   /* soft layered card: hairline border + two-step ambient shadow */
   .soft-card {
     box-shadow:
-      0 1px 2px rgb(16 24 40 / 4%),
-      0 12px 32px -18px rgb(16 24 40 / 18%),
-      inset 0 1px 0 rgb(255 255 255 / 60%);
+      0 1px 2px rgb(16 24 40 / 5%),
+      0 14px 34px -20px rgb(16 24 40 / 20%),
+      inset 0 1px 0 rgb(255 255 255 / 70%);
   }
   .soft-card-hover {
     transition:
@@ -216,5 +234,36 @@
   }
   .recharts-surface:focus {
     outline: none;
+  }
+}
+
+/*
+ * Print / PDF: always a white sheet with dark ink, whatever the screen theme is.
+ * Reports and invoices must not inherit the blue-grey canvas or dark mode.
+ */
+@media print {
+  :root,
+  .dark {
+    --background: #ffffff;
+    --foreground: #1b2430;
+    --card: #ffffff;
+    --card-foreground: #1b2430;
+    --popover: #ffffff;
+    --popover-foreground: #1b2430;
+    --muted: #ffffff;
+    --muted-foreground: #3c4653;
+    --border: #7f8a96;
+    --sidebar: #ffffff;
+    --sidebar-foreground: #1b2430;
+    --sidebar-border: #9aa5b1;
+  }
+  html,
+  body {
+    background: #ffffff !important;
+    color: #1b2430 !important;
+  }
+  .soft-card,
+  .soft-card-hover {
+    box-shadow: none !important;
   }
 }

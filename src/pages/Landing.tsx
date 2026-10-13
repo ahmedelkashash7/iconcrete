@@ -419,12 +419,9 @@ export default function Landing() {
               className="mt-5 text-3xl font-semibold leading-[1.25] tracking-tight sm:text-4xl lg:text-[2.75rem]"
             >
               {pick(
-                "نظام واحد يدير محطة الخرسانة الجاهزة",
-                "One system that runs the ready-mix plant",
+                "منصة لإدارة محطات الخرسانة الجاهزة",
+                "A ready-mix concrete plant management platform",
               )}
-              <span className="text-brand">
-                {pick(" من الألف إلى الياء", " end to end")}
-              </span>
             </motion.h1>
 
             <motion.p
@@ -434,8 +431,8 @@ export default function Landing() {
               className="mt-5 max-w-xl text-sm leading-7 text-muted-foreground sm:text-base"
             >
               {pick(
-                "يجمع التشغيل والإنتاج، الحسابات والهوامش، المخازن والمواد، الجودة والاختبارات، الأسطول والتوزيع، والصيانة والوقود في منظومة واحدة مترابطة. ويبدأ من الأساس الذي لا يُبنى نظام بدونه: قيود إنتاج وكميات يومية دقيقة تتحول لحظيًا إلى إيراد وتكلفة وصافي ربح وهامش — يسجّلها فريق المحطة، ويراها صاحب العمل في اللحظة نفسها. وكل الإدخال يبدأ من ملف Excel يُرفع للكلاود فتظهر الأرقام فورًا.",
-                "It unites operations and production, accounting and margins, stores and materials, quality and testing, fleet and dispatch, and maintenance and fuel in one connected platform. It starts from the foundation no system can skip: precise daily entries that turn instantly into revenue, cost, net profit and margin — entered by the team and seen by the owner in the same moment. And all entry starts from an Excel file uploaded to the cloud, landing instantly.",
+                "منصة لإدارة محطات الخرسانة الجاهزة: تسجيل الإنتاج والجودة والمخازن والأسطول ومتابعة الربحية في مكان واحد.",
+                "A ready-mix concrete plant management platform: track production, quality, inventory, fleet and profitability in one place.",
               )}
             </motion.p>
 
@@ -466,10 +463,9 @@ export default function Landing() {
               className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted-foreground"
             >
               {[
-                pick("دخول آمن لجميع أعضاء الفريق", "Secure access for the whole team"),
-                pick("تحقق مزدوج يمنع أخطاء الإدخال", "Double validation prevents entry errors"),
-                pick("استيراد وتصدير Excel فوري", "Instant Excel import and export"),
-                pick("سجل تتبع لكل عملية بالقيم قبل وبعد", "Full audit trail with before/after values"),
+                pick("دخول بأدوار محددة لكل عضو", "Role-based access for each member"),
+                pick("استيراد وتصدير Excel", "Excel import and export"),
+                pick("سجل تتبع لكل عملية بالقيم قبل وبعد", "Audit trail with before/after values"),
               ].map((line) => (
                 <li key={line} className="inline-flex items-center gap-2">
                   <ShieldCheck className="size-4 text-success" />
@@ -518,8 +514,8 @@ export default function Landing() {
           eyebrow={pick("ما يعمل الآن", "Working now")}
           title={pick("الأساس الذي تبدأ منه المنظومة", "The foundation the platform starts from")}
           description={pick(
-            "الإصدار الأول يثبّت دقة الأرقام اليومية: إدخال واحد يتحول إلى مؤشرات قابلة للقرار، بلا معادلات يدوية ولا جداول متراكمة.",
-            "The first release locks in accurate daily numbers: one entry becomes decision-ready KPIs, with no manual formulas or stacked sheets.",
+            "قيود الإنتاج اليومية تتحول إلى إيراد وتكلفة وهامش لكل وردية، بلا معادلات يدوية.",
+            "Daily production entries become revenue, cost and margin per shift, without manual formulas.",
           )}
         />
 

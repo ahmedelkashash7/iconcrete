@@ -1,4 +1,4 @@
-import { STANDARD_MIX_PRICES, cubeTargetValue, strengthFromName } from "@/convex/pricing";
+import { DEMO_SEED_MIX_PRICES } from "@/convex/pricing";
 import { formatNumber, formatPercent } from "@/lib/format";
 
 /** Shared vocabulary of the ready-mix plant used by the v1 screens. */
@@ -29,13 +29,18 @@ export const STATUS_LABELS: Record<LogStatus, string> = {
 };
 
 /**
- * Standard grades with the plant's approved selling price and cost per m³
- * (EGP). The same table prices operator entries on the server, so the form and
- * the backend can never disagree about a grade's price.
+ * DEMO-ONLY seed grades with a sample selling price and cost per m³ (EGP).
+ *
+ * Hardening v1: this is **not** a price source. Live pricing comes from the
+ * plant's own `mixPrices` list, entered by hand, and a grade that is not on it is
+ * refused (`UNKNOWN_MIX`) instead of being quietly priced as C30/37. The seed
+ * exists so a throwaway demo deployment has something to show, and every row is
+ * flagged `isTestData`.
  */
-export { STANDARD_MIX_PRICES as MIX_PRESETS } from "@/convex/pricing";
+export const DEMO_MIX_PRESETS = DEMO_SEED_MIX_PRICES;
 
-export const MIX_NAMES = STANDARD_MIX_PRICES.map((mix) => mix.name);
+/** Demo grade names — for demo seeds and non-financial screens only. */
+export const DEMO_MIX_NAMES = DEMO_SEED_MIX_PRICES.map((mix) => mix.name);
 
 /** Truck mixer drum capacity used to estimate the number of trips. */
 export const TRUCK_CAPACITY_M3 = 9;
@@ -91,35 +96,27 @@ export const QUALITY_RESULT_TONE: Record<
   pending: "muted",
 };
 
-/** Standard slump target used by the plant's approved mixes. */
-export const DEFAULT_SLUMP_TARGET_MM = 120;
-export const DEFAULT_SLUMP_TOLERANCE_MM = 25;
+/**
+ * A slump value typed into an empty field, so the operator has a starting point.
+ * It is **not** a limit: the specified slump and its tolerance come from the mix
+ * design and an approved rule.
+ */
+export const SLUMP_INPUT_PLACEHOLDER_MM = 120;
 
-/** A 7-day cube is accepted from 70% of the characteristic strength. */
-export const CUBE_7_ACCEPTANCE_RATIO = 0.7;
+/**
+ * REMOVED in hardening v1 — see docs/ARCHITECTURE.md for the full reasoning:
+ *
+ *   CUBE_7_ACCEPTANCE_RATIO / evaluateQualityPreview — the "7-day cube is
+ *     accepted from 70%" rule. It appears nowhere in the Egyptian code: the code
+ *     establishes the early-age relation from trial cubes before execution, and
+ *     3/7-day results are informational only.
+ *   testTargetValue / cubeTargetValue / strengthFromName — derived a cube target
+ *     from the mix *name*, taking the cylinder number of "C30/37".
+ *
+ * Replacement: an explicit `targetCubeMpa` typed by the engineer, judged by the
+ * rule engine in `@/lib/quality/ecp203.ts`.
+ */
 
-export { cubeTargetValue, strengthFromName };
-
-/** The target the server will store for a test, mirrored for the live preview. */
-export function testTargetValue(kind: QualityKind, mixDesign: string): number {
-  if (kind === "slump") return DEFAULT_SLUMP_TARGET_MM;
-  return cubeTargetValue(mixDesign, kind === "cube7" ? "cube7" : "cube28");
-}
-
-/** Mirrors the server's acceptance rule so the form can warn before saving. */
-export function evaluateQualityPreview(
-  kind: QualityKind,
-  targetValue: number,
-  tolerance: number,
-  actualValue: number,
-): QualityResult {
-  if (!Number.isFinite(actualValue) || actualValue <= 0) return "pending";
-  if (kind === "slump") {
-    const band = tolerance > 0 ? tolerance : DEFAULT_SLUMP_TOLERANCE_MM;
-    return Math.abs(actualValue - targetValue) <= band ? "pass" : "fail";
-  }
-  return actualValue >= targetValue ? "pass" : "fail";
-}
 
 /* ------------------------------------------------------------------ */
 /* Stores & materials                                                  */
