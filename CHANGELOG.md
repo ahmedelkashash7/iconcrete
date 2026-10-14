@@ -14,6 +14,13 @@ All notable changes to the IConcrete hardening work. One entry per phase.
 - `docs/OWNER_GUIDE_AR.md` — plain-Arabic owner guide (roles, daily workflow, code-rule approval, backups, keys to rotate, what is not implemented).
 - `docs/KNOWN_LIMITATIONS.md` — what is not built, not wired or not verified.
 - `docs/CONTRAST.md` — the measured WCAG AA report for the design tokens.
+- `docs/DEPLOYMENT.md` — environments table (Local / Preview-staging / Production), the exact Vercel settings, which variable belongs to which scope, how to push Convex functions to staging, the release checklist, rollback, and the owner's manual steps. Arabic first, English summary.
+
+**Deployment & delivery**
+- `scripts/vercel-build.sh` — the build entrypoint Vercel now runs. `VERCEL_ENV=production` pushes the Convex functions first (`npx convex deploy --typecheck enable --cmd "bun run build" --cmd-url-env-var-name VITE_CONVEX_URL`, with `--cmd-url-env-var-name` so the bundle can never disagree with the backend it was just deployed against); every other environment builds the frontend only, against the staging Convex deployment named by `VITE_CONVEX_URL`, and never deploys. Both paths exit non-zero instead of building silently against the wrong backend — verified by running all three guard paths (production without a deploy key, preview without `VITE_CONVEX_URL`, unset `VERCEL_ENV`), each returning `exit=1`.
+- `vercel.json` — created (there was none); it sets `buildCommand` only, so the framework preset and output directory are left exactly as they were.
+- `package.json` — added the `vercel-build` script.
+- `.github/pull_request_template.md` — the merge checklist: checks green, preview actually tested, backward-compatible migration, Convex export taken, rollback plan, owner approval.
 
 **Security**
 - `src/convex/demoMode.ts` — `DEMO_MODE`, **off** unless the deployment explicitly enables it.

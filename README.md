@@ -168,11 +168,28 @@ Secrets are managed through the project's Keys/API-keys UI in the hosted environ
 | `bun run check:contrast` | `node scripts/contrast-check.mjs` | Measure every design-token pair against its WCAG AA target; exits non-zero on a regression. |
 | `bun run format` | `prettier --write .` | Format the project. |
 | `bun run preview` | `vite preview` | Preview the production build. |
+| `bun run vercel-build` | `bash scripts/vercel-build.sh` | The entrypoint Vercel runs. Production pushes the Convex functions first, then builds against that deployment; Preview/other builds the frontend only and never deploys Convex. |
 | `bun run tauri` | `tauri` | Tauri CLI (`bun run tauri build`, `bun run tauri dev`). |
 | `bun run desktop:dev` | `tauri dev` | Run the desktop app against the Vite dev server. |
 | `bun run desktop:build` | `tauri build` | Build the desktop installers (`.exe` / `.msi` on Windows). |
 
 > **Convex codegen:** after editing anything in `src/convex/`, run `bunx convex dev --once` to regenerate `src/convex/_generated/` before type-checking. Never hand-edit generated files — and never commit a hand-written replacement for them.
+
+---
+
+## Deployment
+
+Vercel builds the frontend; Convex functions and the schema are pushed by the
+Convex CLI and are **not** deployed by Vercel by default. `vercel.json` routes
+the Vercel build through `scripts/vercel-build.sh`, which deploys Convex only
+when `VERCEL_ENV=production` and otherwise builds the frontend against staging.
+Never run `convex deploy` by hand against production — the owner promotes a
+change by merging a reviewed pull request into `main`.
+
+Environments, the exact Vercel settings, which variable belongs to which scope,
+the release checklist, rollback and the owner's manual steps are in
+**[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**. The merge checklist is
+`.github/pull_request_template.md`.
 
 ---
 

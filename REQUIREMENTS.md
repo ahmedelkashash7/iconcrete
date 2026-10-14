@@ -10,13 +10,25 @@ Full limitation detail: `docs/KNOWN_LIMITATIONS.md`. Resume point: `STATUS.md`.
 | ID | Requirement | Status | Proof |
 |----|-------------|--------|-------|
 | OP-1 | Evidence over claims; run all checks after every phase and paste real output | done | `docs/PHASE_REPORTS_AR.md`; final sweep recorded in `docs/VERIFICATION.md` |
-| OP-2 | REQUIREMENTS.md + STATUS.md, BLOCKED with reason, no silent skips, commit WIP | partial | This file + `STATUS.md` + `CHANGELOG.md` maintained. Commits: **BLOCKED** (see OP-5) |
+| OP-2 | REQUIREMENTS.md + STATUS.md, BLOCKED with reason, no silent skips, commit WIP | partial | This file + `STATUS.md` + `CHANGELOG.md` maintained. WIP is committed: the platform commits and pushes the workspace at the end of every turn (`docs/DEPLOYMENT.md` §3). It commits everything as **one** commit, so there is no one-commit-per-phase granularity |
 | OP-3 | No paid services | done | New deps: `vitest@3.2.7` (MIT). Scripts use only Node built-ins. No paid tier added |
 | OP-4 | No secrets/real data; synthetic data flagged `isTestData` | done | `bun run check:secrets` → `no committed credentials found` (187 files). `DEMO_SEED_MIX_PRICES` rows carry `isTestData: true` |
-| OP-5 | Record baseline, create branch `hardening-v1`, commit per phase | blocked | `git` refused: *"Git and GitHub commands are blocked; Vly manages version control."* No commit hash, no branch, no `git rm --cached` obtainable. Baseline recorded descriptively in `STATUS.md` |
+| OP-5 | Record baseline, create branch `hardening-v1`, commit per phase | partial | **Baseline now recorded:** `main` = `184ae02f`, remote `https://github.com/ahmedelkashash7/iconcrete`, read from `.git/` on disk + the GitHub API because `git` is refused here (*"Git and GitHub commands are blocked; Vly manages version control."*). **Branch `hardening-v1`: does NOT exist** locally or on GitHub — the platform pushes straight to `main`, so the whole hardening change set is already on `main` (4980 additions / 370 deletions in `184ae02f`). Owner steps to create the branch: `docs/DEPLOYMENT.md` §9 |
 | OP-6 | Read-only platform files: enforce elsewhere and report | done | `convex/auth.ts` untouched; anonymous lockout enforced in `convex/access.ts` + `convex/permissions.ts`. Reported in `docs/KNOWN_LIMITATIONS.md` §12 |
 | OP-7 | Arabic phase reports | done | `docs/PHASE_REPORTS_AR.md` |
 | OP-8 | Exact arithmetic for money and boundary comparisons | partial | `src/lib/exact.ts` (bigint micro-units, decimal-text parsing) + `shareExceeds`; used by all rule comparisons and tested. **Money minor units (3.2): not built** |
+
+## Phase A — Deployment reality check
+
+| ID | Requirement | Status | Proof |
+|----|-------------|--------|-------|
+| A1 | Diagnose and print git state; say which repo, whether the branch is on the remote, whether anything is unpushed | partial | `git` CLI refused by the host, so the state was read from `.git/` (config, HEAD, refs, reflog, loose objects) and the public GitHub API. Result table: `docs/DEPLOYMENT.md` §3. Repo `ahmedelkashash7/iconcrete`; `main` = `184ae02f` on both sides; **nothing unpushed**; `hardening-v1` absent locally and remotely |
+| A2 | Print `vercel.json`, package scripts, env-var names, and the Convex deployment per environment | done | `vercel.json` did not exist; package scripts listed in this file's PR; `.env.example` declares `VITE_CONVEX_URL`, `CONVEX_SITE_URL`, `CONVEX_DEPLOYMENT`; the only deployment reached is the dev one (`bunx convex dev --once` → `exit=0` → `https://famous-owl-975.convex.cloud`). `docs/DEPLOYMENT.md` §3, §5 |
+| A3 | Push `hardening-v1`; if the platform cannot push, give exact manual steps | blocked | Pushing is impossible: git is refused. Manual steps given in `docs/DEPLOYMENT.md` §9, including the warning that protection on `main` will break the platform's direct push |
+| A4 | `scripts/vercel-build.sh` with a production-only Convex deploy; update `package.json`/`vercel.json`; explain the free preview approach | done | `scripts/vercel-build.sh` + `vercel.json` + `vercel-build` script. All three guard paths executed and returned `exit=1` with an explanatory message (`docs/DEPLOYMENT.md` §1). `bash -n` → OK. Production path **not** executed, by instruction |
+| A5 | `.github/pull_request_template.md` checklist | done | File created with the six required sections |
+| A6 | `docs/DEPLOYMENT.md` (Arabic first, short English summary) | done | Environments table, Vercel settings, variable scopes, staging deploy, release checklist, rollback, owner actions, §11 English summary, §12 unverified list |
+| A7 | Arabic report: state, preview-vs-main gap, PR link format, owner actions, mark the unverified | done | `docs/DEPLOYMENT.md` §3 (gap: none in content, the gap is the missing review gate), §9 (PR link format), §10 (owner actions), §12 (unverified) |
 
 ## Phase 0 — Landing text and background
 

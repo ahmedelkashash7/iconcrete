@@ -97,12 +97,50 @@ re-verified by re-running the same check.
 
 ---
 
+## Phase A — deployment / delivery check (2026-10-14)
+
+Git was still unavailable, so the repository state was reconstructed from `.git/`
+on disk (config, `HEAD`, `refs/`, reflogs, loose objects) and cross-checked
+against the public GitHub API. Both sources agree.
+
+| Check | How it was done | Result |
+|---|---|---|
+| Remote | `.git/config` | `github` → `https://github.com/ahmedelkashash7/iconcrete` (public) |
+| Local branch / commit | `.git/HEAD`, `.git/refs/heads/main` | `main` = `184ae02f9311f920d436b4419c81959f6e238e90` |
+| Remote branch / commit | `GET /repos/…/commits/main` | `184ae02f` — "Freebuff: ROLE" — 2026-10-13T01:34:36Z |
+| Branches that exist | `.git/refs/**` + `GET /repos/…/branches` | `main` and `Dev->-create` (`b6cc9191`) only. **`hardening-v1` does not exist** |
+| Unpushed commits | `refs/heads/main` vs `refs/remotes/github/main` | Both `184ae02f` → **none** |
+| Uncommitted work | Hash every file in the commit's tree against the working file | `MODIFIED 0`, `MISSING 0`, untracked only `.env.local` and `tsconfig.app.tsbuildinfo`, both covered by `.gitignore` |
+| Who pushed | `GET /repos/…/actions/runs` | `freebuff-web[bot]`, event `push`, branch `main` |
+| CI on the delivered commit | same | `ci.yml` run #1, `conclusion: success`, 01:34:44Z → 01:35:22Z |
+| Convex deployment in use | `bunx convex dev --once` | `exit=0`; `dev/vly-dev-service-account` → `https://famous-owl-975.convex.cloud`. **Dev only** |
+| `vercel.json` before this phase | `ls` | Did not exist |
+| `convex deploy` flags | `bunx convex deploy --help` (v1.42.1) | `--cmd` and `--cmd-url-env-var-name` both exist and are documented |
+| `scripts/vercel-build.sh` syntax | `bash -n` | OK (`shellcheck` not installed) |
+| Script guard 1 — `VERCEL_ENV=production`, no deploy key | executed | `exit=1`, "Refusing to build…" |
+| Script guard 2 — `VERCEL_ENV=preview`, no `VITE_CONVEX_URL` | executed | `exit=1` |
+| Script guard 3 — `VERCEL_ENV` unset | executed | `exit=1` |
+| Script happy path — preview with a URL | executed | `exit=0`, `$ tsc -b && vite build`, `✓ built in 12.22s` |
+| Full re-run after the phase's edits | — | `typecheck 0 · typecheck:convex 0 · lint 0 (18 warnings) · test 0 (57 passed) · check:secrets 0 (197 files) · check:contrast 0 (62/62) · build 0 (12.91s)` |
+
+**Defect this check found:** the whole hardening change set, worth 4980
+additions, was already sitting on **`main`** — the production branch — pushed
+directly by a bot with no pull request and therefore no review gate. There was
+no `hardening-v1` branch at any point. This is a process defect, not a code
+defect, and it is why `docs/DEPLOYMENT.md` §9 exists.
+
+**Not executed, by instruction:** the `VERCEL_ENV=production` path of
+`scripts/vercel-build.sh`, because it runs `convex deploy`. Its command was
+validated only through `convex deploy --help` and `bash -n`.
+
+---
+
 ## What could NOT be run here
 
 | Check | Why | Consequence |
 |---|---|---|
 | `git diff` / `git log` / branch creation / `git rm --cached` | The platform refuses git commands ("Vly manages version control"). | No baseline hash, no `hardening-v1` branch, no history secret scan, `.env.keys` not removed from the index. |
-| Reading `.env.keys`, `.env.local`, `.env.example` | "Direct env and sensitive-file access is blocked." | The working tree shows no `.env.keys`; its committed content could not be inspected, so the rotation list is written on the assumption that any dotenvx private key that was ever committed is compromised. |
+| Reading `.env.keys` / `.env.local` | "Direct env and sensitive-file access is blocked." | The working tree shows no `.env.keys`; its committed content could not be inspected, so the rotation list is written on the assumption that any dotenvx private key that was ever committed is compromised. (`.env.example`, which holds no values, *is* readable: `VITE_CONVEX_URL`, `CONVEX_SITE_URL`, `CONVEX_DEPLOYMENT`.) |
 | Building the Tauri `.exe` / `.msi` | No Rust/Windows toolchain on this Linux runtime. | The desktop installer does not exist yet. |
 | Screenshots at phone/desktop widths | No browser automation available. | Visual regression is unverified; only the numeric contrast check exists. |
 | `convex-test` integration suite, end-to-end scenario | Not installed / blocked by missing phases | No Convex function is exercised against a database; see `REQUIREMENTS.md` 5.1/5.2. |

@@ -17,6 +17,7 @@
     "check:secrets": "node scripts/secret-scan.mjs --self-test && node scripts/secret-scan.mjs",
     "format": "prettier --write .",
     "preview": "vite preview",
+    "vercel-build": "bash scripts/vercel-build.sh",
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build"
